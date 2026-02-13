@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {% include 'partials/head.html' %}
+</head>
+<body>
+    
+    {% include 'partials/login.html' %}
+
+    <div id="appScreen" class="screen">
+        <div class="container">
+            
+            {% include 'partials/sidebar.html' %}
+
+            <div class="main-content">
+                <div class="header">
+					<div class="header-title" id="pageTitle">Dashboard Principal</div>
+
+					<div class="header-logos">
+						<img src="{{ url_for('static', filename='images/metalwize.jpg') }}" alt="Metalwize">
+						<span class="logo-separator">|</span> <img src="{{ url_for('static', filename='images/usp-sustentavel.png') }}" alt="USP Sustentável">
+					</div>
+
+					<div class="header-info">
+                        <div id="currentUser">👤 Administrador</div>
+                        <div id="dateTime">--/--/---- --:--:--</div>
+                        
+                        <button onclick="handleLogout()" class="btn-logout-header" title="Sair do Sistema">
+                            🚪SAIR
+                        </button>
+                    </div>
+				</div>
+
+                <div class="content">
+                    
+                    <div class="alarm-global-card">
+                        <div class="alarm-global-icon" id="alarme_global_icon">⚠️</div>
+                        <div class="alarm-global-content">
+                            <div class="alarm-global-title">Alarmes do Sistema</div>
+                            <div class="alarm-global-status" id="alarme_global_status">Nenhum alarme</div>
+                            <div class="alarm-global-counter" id="alarme_global_counter">0 alarmes ativos</div>
+                        </div>
+                        <button class="alarm-history-button" onclick="abrirHistoricoAlarmes()">HISTÓRICO</button>
+                    </div>
+
+                    {% include 'partials/dashboard.html' %}
+                    {% include 'partials/weather_station.html' %}
+                    {% include 'partials/sensor_temp.html' %}
+                    {% include 'partials/microturbine.html' %}
+                    {% include 'partials/helio_base.html' %}
+                    {% include 'partials/system.html' %}
+                    {% include 'partials/reports.html' %}
+                    {% include 'partials/users.html' %}
+					{% include 'partials/about.html' %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<div id="modalAlarmHistory" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: #1e1e1e; padding: 0; border-radius: 8px; width: 1200px; border: 1px solid #444; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        
+        <div style="background: #252525; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;">
+            <div style="font-size: 1.1em; font-weight: bold; color: #fff;">📜 Últimos Alarmes Registrados</div>
+            <button onclick="document.getElementById('modalAlarmHistory').style.display='none'" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 1.2em;">✕</button>
+        </div>
+
+        <div style="padding: 20px;">
+            <table style="width: 100%; border-collapse: collapse; color: #ddd; font-size: 0.9em;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #444; color: #888; text-align: left;">
+                        <th style="padding: 8px;">Data/Hora</th>
+                        <th style="padding: 8px;">Categoria</th>
+                        <th style="padding: 8px;">Mensagem</th>
+                    </tr>
+                </thead>
+                <tbody id="alarmHistoryTableBody">
+                    </tbody>
+            </table>
+        </div>
+        
+        <div style="padding: 15px; background: #252525; text-align: right;">
+            <button class="btn-secondary" onclick="document.getElementById('modalAlarmHistory').style.display='none'">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modalSensorChart" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: #1e1e1e; padding: 20px; border-radius: 12px; width: 700px; height: 500px; border: 1px solid #444; display: flex; flex-direction: column;">
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div class="section-title" id="chartTitle" style="margin: 0; font-size: 1.2em;">Histórico do Sensor</div>
+            <button onclick="document.getElementById('modalSensorChart').style.display='none'" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 1.5em;">&times;</button>
+        </div>
+
+        <div style="flex: 1; position: relative; width: 100%; min-height: 0;">
+            <canvas id="sensorChartCanvas"></canvas>
+        </div>
+
+    </div>
+</div>
+
+
+
+    {% include 'partials/modals.html' %}
+
+	<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+	<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+</body>
+
+<div id="modalSecretEditor" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: #0f0f0f; border: 1px solid #00ff00; width: 800px; height: 600px; padding: 0; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);">
+        
+        <div style="background: #003300; color: #00ff00; padding: 10px 15px; font-family: monospace; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #00ff00;">
+            <span>ADMIN_TERMINAL // HELIOT.CONFIG</span>
+            <span style="cursor: pointer;" onclick="document.getElementById('modalSecretEditor').style.display='none'">[X]</span>
+        </div>
+
+        <textarea id="secretConfigContent" style="flex: 1; background: #000; color: #00ff00; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; resize: none; outline: none; line-height: 1.5;"></textarea>
+        
+        <div style="padding: 10px; border-top: 1px solid #333; display: flex; justify-content: flex-end; gap: 10px; background: #111;">
+            <button class="btn-secondary" onclick="document.getElementById('modalSecretEditor').style.display='none'">CANCELAR</button>
+            <button onclick="salvarConfigSecreta()" style="background: #00ff00; color: #000; border: none; padding: 8px 20px; font-weight: bold; font-family: monospace; cursor: pointer;">SALVAR ALTERAÇÕES</button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

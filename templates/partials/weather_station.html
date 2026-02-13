@@ -1,0 +1,142 @@
+<div id="weatherStation" class="screen">
+    <div class="form-section">
+        <div class="section-title">Dados da Estação Meteorológica</div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+            
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('DNI', 'W/m²')">⚙️</button>
+                    <div class="card-title">DNI (Direta)</div>
+                </div>
+                <div class="card-value" id="dni_estacao_valor">-- W/m²</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('GHI', 'W/m²')">⚙️</button>
+                    <div class="card-title">GHI (Global)</div>
+                </div>
+                <div class="card-value" id="ghi_estacao_valor">-- W/m²</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Difusa', 'W/m²')">⚙️</button>
+                    <div class="card-title">DHI (Difusa)</div>
+                </div>
+                <div class="card-value" id="dhi_estacao_valor">-- W/m²</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Velocidade do Vento', 'm/s')">⚙️</button>
+                    <div class="card-title">Velocidade Vento</div>
+                </div>
+                <div class="card-value" id="vento_vel_estacao_valor">-- m/s</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Direção do Vento', '°')">⚙️</button>
+                    <div class="card-title">Direção Vento</div>
+                </div>
+                <div class="card-value" id="vento_dir_estacao_valor">--°</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Taxa de Chuva', 'mm/h')">⚙️</button>
+                    <div class="card-title">Taxa de Chuva</div>
+                </div>
+                <div class="card-value" id="taxa_estacao_valor">-- mm/h</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Precipitação Acumulada', 'mm')">⚙️</button>
+                    <div class="card-title">Precipitação</div>
+                </div>
+                <div class="card-value" id="precipitacao_estacao_valor">-- mm</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Temperatura', '°C')">⚙️</button>
+                    <div class="card-title">Temperatura</div>
+                </div>
+                <div class="card-value" id="temperatura_estacao_valor">-- °C</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Umidade', '%')">⚙️</button>
+                    <div class="card-title">Umidade</div>
+                </div>
+                <div class="card-value" id="umidade_estacao_valor">-- %</div>
+            </div>
+
+            <div class="weather-data-card">
+                <div class="card-header-row">
+                    <button class="btn-config-mini" onclick="openWeatherAlarmModal('Pressão', 'hPa')">⚙️</button>
+                    <div class="card-title">Pressão Atmosférica</div>
+                </div>
+                <div class="card-value" id="pressao_estacao_valor">-- hPa</div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="modalWeatherConfig" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: #1e1e1e; padding: 25px; border-radius: 8px; width: 400px; border: 1px solid #333;">
+            <div class="section-title" id="modalWeatherTitle" style="margin-bottom: 20px;">Configurar Parâmetro</div>
+            
+            <input type="hidden" id="weatherParamKey">
+
+            <div class="form-row">
+                <div>
+                    <div class="form-label">Mínimo (<span id="weatherModalUnitMin"></span>)</div>
+                    <input type="number" id="weatherMinInput" class="form-input">
+                </div>
+                <div>
+                    <div class="form-label">Máximo (<span id="weatherModalUnitMax"></span>)</div>
+                    <input type="number" id="weatherMaxInput" class="form-input">
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 20px; justify-content: flex-end;">
+                <button class="btn-secondary" onclick="closeWeatherModal()" style="margin-right: 10px;">Cancelar</button>
+                <button class="btn-primary" onclick="saveWeatherConfig()">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .card-header-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .btn-config-mini {
+            background: transparent;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1.1em;
+            transition: color 0.2s;
+            line-height: 1;
+        }
+
+        .btn-config-mini:hover {
+            color: #00d084;
+            transform: scale(1.1);
+        }
+
+        .weather-data-card .card-title {
+            margin-bottom: 0 !important;
+        }
+    </style>
+</div>

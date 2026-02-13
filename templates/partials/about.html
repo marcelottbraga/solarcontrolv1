@@ -1,0 +1,63 @@
+<div id="aboutScreen" class="screen">
+    <div class="about-wrapper">
+        <div class="about-card">
+            
+            <div class="about-logos">
+                <a href="http://www.metalwize.com.br" target="_blank" rel="noopener noreferrer" title="Visitar site da Metalwize">
+                    <img src="{{ url_for('static', filename='images/metalwize.jpg') }}" alt="Metalwize" class="brand-logo">
+                </a>
+
+                <div class="divider-vertical"></div>
+
+                <a href="https://www5.usp.br/" target="_blank" rel="noopener noreferrer" title="Visitar site da USP Sustentável">
+                    <img src="{{ url_for('static', filename='images/usp-sustentavel.png') }}" alt="USP Sustentável" class="brand-logo">
+                </a>
+            </div>
+
+            <div class="about-header">
+                <h2>Solar Control System</h2>
+                <span class="version-badge" 
+                      onclick="triggerEasterEgg()" 
+                      style="cursor: pointer; user-select: none;" 
+                      title="...">
+                      Versão 1.1.9 (Build 2025.12)
+                </span>
+            </div>
+
+            <div class="about-content">
+                <p>
+                    O <strong>Solar Control System</strong> é uma plataforma de supervisão e controle de alta performance desenvolvida para plantas heliotérmicas. O sistema integra monitoramento em tempo real de sensores térmicos, estações meteorológicas e atuadores de campo, garantindo eficiência energética e segurança operacional.
+                </p>
+                <p>
+                    Desenvolvido através da cooperação técnica entre <strong>Metalwize</strong> e <strong>USP</strong>, este software utiliza arquitetura modular para controle preciso de heliostatos e microturbina.
+                </p>
+            </div>
+
+            <hr class="about-separator">
+
+            <div class="about-specs">
+                <div class="spec-item">
+                    <span class="spec-label">Backend Core</span>
+                    <span class="spec-value">Python / Flask / SCADA Br</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Comunicação</span>
+                    <span class="spec-value">Modbus TCP/IP</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Interface</span>
+                    <span class="spec-value">HTML5 / JS (ECMAScript 6)</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Banco de Dados</span>
+                    <span class="spec-value">SQLite / PostgreeSQL</span>
+                </div>
+            </div>
+
+            <div class="about-footer">
+                <p>© 2025 Metalwize. Todos os direitos reservados.</p>
+                <p>Este software é protegido por leis de direitos autorais e tratados internacionais.</p>
+            </div>
+        </div>
+    </div>
+</div>

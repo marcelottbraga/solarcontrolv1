@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Heliot</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9pt;
+            }
+        }
+        body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; }
+        
+        /* Cabeçalho */
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #00d084; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 18pt; color: #000; text-transform: uppercase; }
+        .header p { margin: 2px 0; font-size: 10pt; color: #666; }
+        .meta-info { font-size: 9pt; text-align: right; margin-bottom: 10px; color: #555; }
+
+        /* Tabela */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background-color: #f0f0f0; border-bottom: 2px solid #ccc; font-weight: bold; padding: 8px; text-align: left; font-size: 9pt; }
+        td { padding: 8px; border-bottom: 1px solid #eee; font-size: 9pt; vertical-align: top; }
+        
+        /* Zebrado (Linhas pares/impares) */
+        tr:nth-child(even) { background-color: #fafafa; }
+        
+        /* Quebra de texto para a coluna de Detalhes (JSON) */
+        .col-detalhes { word-wrap: break-word; max-width: 300px; font-family: 'Courier New', monospace; font-size: 8pt; }
+        
+        /* Rodapé */
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 8pt; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Relatório do Sistema</h1>
+        <p>Metalwize | USP </p>
+        <p><strong>Tipo:</strong> {{ titulo }}</p>
+    </div>
+
+    <div class="meta-info">
+        Gerado por: {{ usuario }} <br>
+        Emissão: {{ data_emissao }} <br>
+        Período: {{ inicio }} até {{ fim }}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                {% for col in colunas %}
+                <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in linhas %}
+            <tr>
+                {% for val in linha %}
+                <td class="{{ 'col-detalhes' if loop.last else '' }}">{{ val }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Documento gerado automaticamente pelo Sistema Heliot - Uso Interno
+    </div>
+</body>
+</html>

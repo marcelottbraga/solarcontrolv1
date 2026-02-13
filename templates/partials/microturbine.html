@@ -1,0 +1,120 @@
+<div id="microturbine" class="screen" style="overflow-y: auto;">
+    
+    <div class="form-section" style="display: flex; flex-direction: column; margin-bottom: 20px;">
+        <div class="section-title">INFORMAÇÕES DA MICROTURBINA</div>
+        <div style="display: flex; gap: 20px; flex: 1; margin-top: 15px;">
+            <div style="flex: 3; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 20px;">
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Info 1</div>
+                    <div class="clp-status-indicator"><div class="clp-status-text" id="mt_info_1">---</div></div>
+                </div>
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Info 2</div>
+                    <div class="clp-status-indicator"><div class="clp-status-text" id="mt_info_2">---</div></div>
+                </div>
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Info 3</div>
+                    <div class="clp-status-indicator"></div>
+                </div>
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Info 4</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-dot offline" id="mt_info_4_dot"></div>
+                        <div class="clp-status-text" id="mt_info_4">---</div>
+                    </div>
+                </div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                <button class="btn-primary" id="btn_cmd_1" style="flex: 1; font-size: 18px; font-weight: bold;">Comando 1</button>
+                <button class="btn-primary" id="btn_cmd_2" style="flex: 1; font-size: 18px; font-weight: bold;">Comando 2</button>
+                <button class="btn-primary" id="btn_cmd_3" style="flex: 1; font-size: 18px; font-weight: bold;">Comando 3</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section" style="display: flex; flex-direction: column;">
+        <div class="section-title">VENTILADOR</div>
+        
+        <div style="display: flex; gap: 20px; flex: 1; margin-top: 15px;">
+
+            <div style="flex: 3; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 20px;">
+                
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Status Geral</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-text" id="vt_status_geral">---</div>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Falhas e Alarmes</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-text" id="vt_falhas" style="color: #ffcc00;">---</div>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Velocidade Atual</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-text" id="vt_velocidade_read">--- RPM</div>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Corrente do Motor</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-text" id="vt_corrente">--- A</div>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Modo de Operação</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-text" id="vt_modo_texto">---</div>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="display: flex; flex-direction: column; justify-content: center; margin: 0;">
+                    <div class="clp-status-title">Estado do Motor</div>
+                    <div class="clp-status-indicator">
+                        <div class="clp-status-dot offline" id="vt_led_run"></div>
+                        <div class="clp-status-text" id="vt_led_text">PARADO</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                
+                <div class="clp-status-card" style="padding: 15px; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="clp-status-title" style="margin-bottom: 10px;">Controle</div>
+                    <div style="display: flex; gap: 15px; align-items: center; color: #fff;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="vt_controle" value="local" > Local
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="radio" name="vt_controle" value="remoto" checked> Remoto
+                        </label>
+                    </div>
+                </div>
+
+                <div class="clp-status-card" style="padding: 15px; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="clp-status-title" style="margin-bottom: 10px;">Setpoit Velocidade</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="color: #aaa;">-</span>
+                        <input type="range" id="vt_slider_velocidade" min="0" max="100" value="0" style="width: 100%;">
+                        <span style="color: #aaa;">+</span>
+                    </div>
+                    <div style="text-align: center; margin-top: 5px; font-weight: bold; color: #00d084;" id="vt_slider_val">0 %</div>
+                </div>
+
+                <button class="btn-primary" id="vt_btn_power" style="flex: 1; font-size: 18px; font-weight: bold;">
+                    LIGA
+                </button>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>

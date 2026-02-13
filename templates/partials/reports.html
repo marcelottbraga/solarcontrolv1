@@ -1,0 +1,75 @@
+<div id="reports" class="screen">
+    <div class="form-section">
+        <div class="section-title">Gerador de Relatórios</div>
+
+        <div class="form-row">
+            <div style="grid-column: 1 / -1;">
+                <div class="form-label">Tipo de Relatório</div>
+                <select id="reportType" class="form-input" onchange="toggleReportOptions()">
+                    <option value="events">📜 Log de Eventos do Sistema (Auditoria)</option>
+                    <option value="weather">🌦️ Histórico da Estação Meteorológica</option>
+                    <option value="sensors">🌡️ Histórico dos Termopares</option>
+                    <option value="alarms">🚨 Histórico de Alarmes</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="eventFilterOptions" class="form-row" style="display: block; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid #444;">
+            <div class="form-label" style="margin-bottom: 10px; color: #00d084;">Filtrar Tipos de Evento:</div>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="eventType" value="LOGIN" checked> Login/Logout
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="eventType" value="CONFIG" checked> Configurações
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="eventType" value="COMANDO" checked> Comandos Manuais
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="eventType" value="BASES" checked> Heliostatos
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="eventType" value="USUARIOS" checked> Usuários
+                </label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">Data Inicial</div>
+                <input type="datetime-local" id="reportStartDate" class="form-input">
+            </div>
+            <div>
+                <div class="form-label">Data Final</div>
+                <input type="datetime-local" id="reportEndDate" class="form-input">
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-top: -10px; margin-bottom: 20px;">
+            <div style="grid-column: 1 / -1; display: flex; gap: 10px;">
+                <button class="btn-secondary" style="padding: 5px 15px; font-size: 0.8em;" onclick="setReportPeriod(0)">Hoje</button>
+                <button class="btn-secondary" style="padding: 5px 15px; font-size: 0.8em;" onclick="setReportPeriod(7)">Últimos 7 dias</button>
+                <button class="btn-secondary" style="padding: 5px 15px; font-size: 0.8em;" onclick="setReportPeriod(30)">Últimos 30 dias</button>
+            </div>
+        </div>
+
+        <div class="btn-group" style="margin-top: 20px;">
+            <button id="btnVisualizarTela" class="btn-primary" onclick="gerarRelatorioTela()">🔍 Visualizar na Tela</button>
+            
+            <button class="btn-secondary" onclick="baixarCSV()">📥 Exportar CSV (Excel)</button>
+            
+            <button id="btnExportarPDF" class="btn-danger" onclick="baixarPDF()">📄 Exportar PDF</button>
+        </div>
+
+        <div id="previewArea" style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
+            <div class="section-title">Pré-visualização</div>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; color: #ddd; font-size: 0.9em;">
+                    <thead id="reportTableHead"></thead>
+                    <tbody id="reportTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

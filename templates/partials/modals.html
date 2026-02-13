@@ -1,0 +1,111 @@
+<div id="commandModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title" id="modalTitle">Confirmar Ação</div>
+        <div class="modal-message" id="modalMessage">Deseja confirmar a execução deste comando?</div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-confirm" onclick="confirmCommand()">SIM</button>
+            <button class="modal-btn modal-btn-cancel" onclick="cancelCommand()">CANCELAR</button>
+        </div>
+    </div>
+</div>
+
+<div id="weatherAlarmModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title" id="weatherAlarmTitle">Configurar Alarmes</div>
+        <div class="form-group">
+            <label class="form-label">Valor Mínimo para Alarme</label>
+            <input type="number" class="form-input" id="weatherAlarmMin" placeholder="Digite o valor mínimo">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Valor Máximo para Alarme</label>
+            <input type="number" class="form-input" id="weatherAlarmMax" placeholder="Digite o valor máximo">
+        </div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-confirm" onclick="saveWeatherAlarmThresholds()">SALVAR</button>
+            <button class="modal-btn modal-btn-cancel" onclick="closeWeatherAlarmModal()">CANCELAR</button>
+        </div>
+    </div>
+</div>
+
+<div id="newUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title">Novo Usuário</div>
+        <div class="form-label">Usuário</div>
+        <input id="newuserusername" class="form-input" placeholder="Usuário">
+        <div class="form-label">Nome Completo</div>
+        <input id="newusername" class="form-input" placeholder="Nome completo">
+        <div class="form-label">Email</div>
+        <input id="newuseremail" class="form-input" placeholder="Email">
+        <div class="form-label">Senha</div>
+        <input id="newuserpassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres">
+        <div class="form-label">Confirmar Senha</div>
+        <input id="newuserpasswordconfirm" class="form-input" type="password" placeholder="Confirmar senha">
+        <div class="form-label">Perfil</div>
+        <select id="newuserrole">
+            <option>Administrador</option>
+            <option>Operador</option>
+            <option>Visualizador</option>
+        </select>
+        <div class="modal-buttons" style="margin-top: 24px;">
+            <button class="modal-btn modal-btn-confirm" onclick="saveNewUser()">Salvar</button>
+            <button class="modal-btn modal-btn-cancel" onclick="closeNewUserModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="editUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title">Editar Usuário</div>
+        <div class="form-label">Usuário</div>
+        <input id="edituserusername" class="form-input" placeholder="Usuário">
+        <div class="form-label">Nome Completo</div>
+        <input id="editusername" class="form-input" placeholder="Nome completo">
+        <div class="form-label">Email</div>
+        <input id="edituseremail" class="form-input" placeholder="Email">
+        <div class="form-label">Nova Senha (opcional)</div>
+        <input id="edituserpassword" class="form-input" type="password" placeholder="Nova senha">
+        <div class="form-label">Confirmar Senha</div>
+        <input id="edituserpasswordconfirm" class="form-input" type="password" placeholder="Confirmar senha">
+        <div class="form-label">Perfil</div>
+        <select id="edituserrole">
+            <option>Administrador</option>
+            <option>Operador</option>
+            <option>Visualizador</option>
+        </select>
+        <div class="modal-buttons" style="margin-top: 24px;">
+            <button class="modal-btn modal-btn-confirm" onclick="saveEditUser()">Salvar</button>
+            <button class="modal-btn modal-btn-cancel" onclick="closeEditUserModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="deleteUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title">Excluir Usuário</div>
+        <div class="modal-message">Tem certeza que deseja apagar este usuário?</div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-confirm" onclick="confirmDeleteUser()">Sim</button>
+            <button class="modal-btn modal-btn-cancel" onclick="closeDeleteUser()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div class="alarm-modal-overlay" id="alarmModalOverlay" onclick="fecharHistoricoAlarmes()"></div>
+<div class="alarm-modal" id="alarmModal">
+  <div class="alarm-modal-header">
+    <h3>Histórico de Alarmes</h3>
+    <button class="alarm-modal-close" onclick="fecharHistoricoAlarmes()">✕</button>
+  </div>
+  <div class="alarm-modal-body">
+    <table class="alarm-modal-table">
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Descrição</th>
+        </tr>
+      </thead>
+      <tbody id="alarmModalTableBody">
+        </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,167 @@
+<div id="dashboard" class="screen active">
+    <div class="command-section">
+        <div class="command-section-title">Comandos Manuais</div>
+        <div class="command-buttons-grid">
+            <button class="command-btn-main" onclick="openCommandModal('Comando 1', 'comando1')">Comando 1</button>
+            <button class="command-btn-main" onclick="openCommandModal('Comando 2', 'comando2')">Comando 2</button>
+            <button class="command-btn-main" onclick="openCommandModal('Comando 3', 'comando3')">Comando 3</button>
+            <button class="command-btn-main" onclick="openCommandModal('Comando 4', 'comando4')">Comando 4</button>
+            <button class="command-btn-main" onclick="openCommandModal('Comando 5', 'comando5')">Comando 5</button>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        
+        <div class="dashboard-left">
+            <div class="heatmap-container" style="height: 450px; display: flex; flex-direction: column;">
+                <div class="heatmap-title">Mapa Térmico</div>
+                <div class="heatmap-wrapper" style="flex: 1; display: grid; grid-template-columns: 1fr 50px; gap: 12px; align-items: start;">
+                    <div class="heatmap-grid-90" id="heatmapCells"></div>
+                    <div class="heatmap-scale">
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #0047ab, #0066cc);"></div><span>0°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #0080ff, #00a8ff);"></div><span>200°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #00d4ff, #00ffff);"></div><span>300°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #00ff00, #7fff00);"></div><span>400°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #ffff00, #ffa500);"></div><span>500°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #ff8000, #ff4500);"></div><span>600°C</span></div>
+                        <div class="scale-item"><div class="scale-color" style="background: linear-gradient(to top, #ff0000, #cc0000);"></div><span>700°C</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="heatmap-container" style="height: 450px; display: flex; flex-direction: column;">
+            <div class="heatmap-title">Heliostatos</div>
+            
+            <div style="flex: 1; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 16px;">
+                <div id="heliostatosGrid" style="display: flex; flex-direction: column; align-items: center; gap: 5px;"></div>
+            </div>
+
+            <div class="heliostat-legend">
+                <div class="legend-item"><span class="legend-dot status-gray"></span> <span>Não Configurado</span></div>
+                <div class="legend-item"><span class="legend-dot status-red"></span> <span>Offline</span></div>
+                <div class="legend-item"><span class="legend-dot status-blue"></span> <span>Online</span></div>
+                <div class="legend-item"><span class="legend-dot status-green"></span> <span>Ativo</span></div>
+            </div>
+        </div>
+
+        <div class="dashboard-right">
+            <div class="form-section" style="margin: 0; box-shadow: var(--shadow-sm); height: 450px; display: flex; flex-direction: column;">
+                <div class="section-title" style="margin-bottom: 16px;">Dados da Estação</div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; flex: 1; height: 100%;">
+                    
+                    <div class="weather-item" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <div class="card-title" id="dash_slot_1_title" style="margin-bottom: 5px;">--</div>
+                        <div class="card-value" id="dash_slot_1_val" style="font-size: 22px;">--</div>
+                    </div>
+
+                    <div class="weather-item" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <div class="card-title" id="dash_slot_2_title" style="margin-bottom: 5px;">--</div>
+                        <div class="card-value" id="dash_slot_2_val" style="font-size: 22px;">--</div>
+                    </div>
+
+                    <div class="weather-item" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <div class="card-title" id="dash_slot_3_title" style="margin-bottom: 5px;">--</div>
+                        <div class="card-value" id="dash_slot_3_val" style="font-size: 22px;">--</div>
+                    </div>
+
+                    <div class="weather-item" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <div class="card-title" id="dash_slot_4_title" style="margin-bottom: 5px;">--</div>
+                        <div class="card-value" id="dash_slot_4_val" style="font-size: 22px;">--</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div> <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px;">
+       <div class="heatmap-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; padding: 10px;">
+            <div class="heatmap-title" style="width: 100%; display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span>📹 Câmera 1 (Ao Vivo)</span>
+                <span id="cam1_status" style="font-size: 11px; color: #00d084;">ONLINE</span>
+            </div>
+            
+            <div style="width: 100%; height: 260px; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-border);">
+               {# <img src="/video_feed_1" 
+                     style="width: 100%; height: 100%; object-fit: cover;"
+                     onerror="this.style.display='none';"> #}
+            </div>
+        </div>
+
+        <div class="heatmap-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; padding: 10px;">
+            <div class="heatmap-title" style="width: 100%; display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span>📹 Câmera 2 (Ao Vivo)</span>
+                <span id="cam2_status" style="font-size: 11px; color: #00d084;">ONLINE</span>
+            </div>
+            
+            <div style="width: 100%; height: 260px; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-border);">
+                {# <img src="/video_feed_2" 
+                     style="width: 100%; height: 100%; object-fit: cover;"
+                     onerror="this.style.display='none';"> #}
+            </div>
+        </div>
+    </div>
+	
+    <div id="modalHeliostato" class="modal" style="z-index: 10001;">
+    <div class="modal-content">
+        
+        <div class="helio-modal-header">
+            <h3 style="margin: 0; font-size: 16px; color: var(--color-text);">HELIOSTATO <span id="modalHelioTitle" style="color: var(--color-primary);">--</span></h3>
+            <span style="cursor: pointer; font-size: 20px; color: #aaa;" onclick="fecharModalHeliostato()">✕</span>
+        </div>
+
+        <div class="helio-modal-body">
+            
+            <div id="statusBorder" class="status-box">
+                <div>
+                    <div class="modal-info-label">STATUS ATUAL</div>
+                    <div id="modalHelioStatus" style="font-weight: bold; color: #fff;">---</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="modal-info-label">MODO</div>
+                    <div id="modalHelioModo" style="font-weight: bold; color: var(--color-accent);">---</div>
+                </div>
+            </div>
+
+            <div class="modal-info-grid">
+                <div class="modal-info-card">
+                    <div class="modal-info-label">Alpha (α)</div>
+                    <div class="modal-info-value" id="valAlpha">0.0°</div>
+                </div>
+                <div class="modal-info-card">
+                    <div class="modal-info-label">Beta (β)</div>
+                    <div class="modal-info-value" id="valBeta">0.0°</div>
+                </div>
+                <div class="modal-info-card">
+                    <div class="modal-info-label">Theta (θ)</div>
+                    <div class="modal-info-value" id="valTheta">0.0°</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 5px;">
+                <div class="form-label" style="margin-bottom: 8px;">Comando Manual</div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <input type="number" id="inputAlpha" class="form-input" placeholder="Alpha (°)" step="0.1">
+                    <input type="number" id="inputBeta" class="form-input" placeholder="Beta (°)" step="0.1">
+                </div>
+
+                <button id="btnMover" class="btn-primary" onclick="enviarComandoHelio('manual')" style="width: 100%; margin-bottom: 15px;">
+                    MOVER PARA POSIÇÃO
+                </button>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-secondary" onclick="enviarComandoHelio('auto')" style="flex: 1; border: 1px solid var(--color-success); color: var(--color-success);">
+                        RASTREAR
+                    </button>
+                    <button class="btn-secondary" onclick="enviarComandoHelio('stop')" style="flex: 1; border: 1px solid var(--color-error); color: var(--color-error);">
+                        PARAR
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+</div> 

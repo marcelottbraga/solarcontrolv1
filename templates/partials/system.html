@@ -1,0 +1,200 @@
+<div id="system" class="screen">
+    
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+        <div class="clp-status-card">
+            <div class="clp-status-title">Status do CLP</div>
+            <div class="clp-status-indicator" id="clpStatus">
+                <div class="clp-status-dot online"></div>
+                <div class="clp-status-text">ONLINE</div>
+            </div>
+            <div class="clp-status-info" style="visibility: hidden;">.</div> 
+        </div>
+
+        <div class="clp-status-card">
+            <div class="clp-status-title">Estação Meteorológica</div>
+            <div class="clp-status-indicator" id="weatherStatus">
+                <div class="clp-status-dot online"></div>
+                <div class="clp-status-text">ONLINE</div>
+            </div>
+        </div>
+
+        <div class="clp-status-card">
+            <div class="clp-status-title">WiFi Heliostatos</div>
+            <div class="clp-status-indicator" id="wifiStatus">
+                <div class="clp-status-dot offline"></div> 
+                <div class="clp-status-text">OFFLINE</div>
+            </div>
+            
+        </div>
+
+
+        <div class="clp-status-card">
+            <div class="clp-status-title">Ventilador</div>
+            <div class="clp-status-indicator" id="ventiladorStatus">
+                <div class="clp-status-dot offline"></div> 
+                <div class="clp-status-text">OFFLINE</div>
+            </div>
+        </div>
+    </div>
+		
+    <div class="form-section">
+        <div class="section-title">Endereços IP do Sistema</div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Estação Meteorológica</div>
+                <input type="text" class="form-input" id="ip_estacao" placeholder="127.0.0.1">
+            </div>
+            <div>
+                <div class="form-label">Porta Estação</div>
+                <input type="number" class="form-input" id="porta_estacao" placeholder="502">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Termostatos</div>
+                <input type="text" class="form-input" id="ip_termostatos" placeholder="127.0.0.1">
+            </div>
+            <div>
+                <div class="form-label">Porta Termostatos</div>
+                <input type="number" class="form-input" id="porta_termostatos" placeholder="1502">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Roteador WiFi</div>
+                <input type="text" class="form-input" id="ip_roteador" placeholder="192.168.5.12">
+            </div>
+            <div>
+                <div class="form-label">Porta Roteador WiFi</div>
+                <input type="number" class="form-input" id="porta_roteador" placeholder="1502">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Inversor</div>
+                <input type="text" class="form-input" id="ip_ventilador" placeholder="192.168.1.55">
+            </div>
+            <div>
+                <div class="form-label">Porta Inversor</div>
+                <input type="number" class="form-input" id="porta_ventilador" placeholder="502">
+            </div>
+        </div>
+		
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Camera 1</div>
+                <input type="text" class="form-input" id="ip_camera1" placeholder="Ex: 192.168.5.90">
+            </div>
+            <div>
+                <div class="form-label">Porta Camera 1</div>
+                <input type="number" class="form-input" id="porta_camera1" placeholder="8080">
+            </div>
+        </div>
+		
+        <div class="form-row">
+            <div>
+                <div class="form-label">IP Camera 2</div>
+                <input type="text" class="form-input" id="ip_camera2" placeholder="Ex: 192.168.5.91">
+            </div>
+            <div>
+                <div class="form-label">Porta Camera 2</div>
+                <input type="number" class="form-input" id="porta_camera2" placeholder="8080">
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 20px; border-top: 1px solid var(--color-border); padding-top: 20px; grid-template-columns: repeat(2, 1fr) !important;">
+            <div style="grid-column: 1 / -1;">
+                <div class="section-title" style="font-size: 14px; margin-bottom: 10px;">Personalizar Dashboard (Slots 1 a 4) da Estação Meteorológica</div>
+            </div>
+            
+            <div>
+                <div class="form-label">Slot 1 (Topo Esq.)</div>
+                <select id="cfg_dash_slot1" class="form-input">
+                    <option value="dni">DNI</option>
+                    <option value="ghi">GHI</option>
+                    <option value="dhi">Difusa (DHI)</option>
+                    <option value="vento_velocidade">Velocidade Vento</option>
+                    <option value="vento_direcao">Direção Vento</option>
+                    <option value="precipitacao">Precipitação</option>
+                    <option value="taxa_chuva">Taxa de Chuva</option>
+                    <option value="temperatura">Temperatura</option>
+                    <option value="umidade">Umidade</option>
+                    <option value="pressao">Pressão</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="form-label">Slot 2 (Topo Dir.)</div>
+                <select id="cfg_dash_slot2" class="form-input">
+                    <option value="dni">DNI</option>
+                    <option value="ghi">GHI</option>
+                    <option value="dhi">Difusa (DHI)</option>
+                    <option value="vento_velocidade">Velocidade Vento</option>
+                    <option value="vento_direcao">Direção Vento</option>
+                    <option value="precipitacao">Precipitação</option>
+                    <option value="taxa_chuva">Taxa de Chuva</option>
+                    <option value="temperatura">Temperatura</option>
+                    <option value="umidade">Umidade</option>
+                    <option value="pressao">Pressão</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="form-label">Slot 3 (Base Esq.)</div>
+                <select id="cfg_dash_slot3" class="form-input">
+                    <option value="dni">DNI</option>
+                    <option value="ghi">GHI</option>
+                    <option value="dhi">Difusa (DHI)</option>
+                    <option value="vento_velocidade">Velocidade Vento</option>
+                    <option value="vento_direcao">Direção Vento</option>
+                    <option value="precipitacao">Precipitação</option>
+                    <option value="taxa_chuva">Taxa de Chuva</option>
+                    <option value="temperatura">Temperatura</option>
+                    <option value="umidade">Umidade</option>
+                    <option value="pressao">Pressão</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="form-label">Slot 4 (Base Dir.)</div>
+                <select id="cfg_dash_slot4" class="form-input">
+                    <option value="dni">DNI</option>
+                    <option value="ghi">GHI</option>
+                    <option value="dhi">Difusa (DHI)</option>
+                    <option value="vento_velocidade">Velocidade Vento</option>
+                    <option value="vento_direcao">Direção Vento</option>
+                    <option value="precipitacao">Precipitação</option>
+                    <option value="taxa_chuva">Taxa de Chuva</option>
+                    <option value="temperatura">Temperatura</option>
+                    <option value="umidade">Umidade</option>
+                    <option value="pressao">Pressão</option>    
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 20px; border-top: 1px solid var(--color-border); padding-top: 20px;">
+            <div style="grid-column: 1 / -1;">
+               <div class="section-title" style="font-size: 14px; margin-bottom: 10px;">Configuração de Tempos (Segundos)</div>
+            </div>
+            
+            <div>
+                <div class="form-label">Histórico Estação</div>
+                <input type="number" class="form-input" id="tempo_gravacao_estacao" placeholder="15" min="1">
+            </div>
+
+            <div>
+                <div class="form-label">Histórico Termopares</div>
+                <input type="number" class="form-input" id="tempo_gravacao_termostatos" placeholder="5" min="1">
+            </div>
+        </div>
+					
+        <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn-secondary">CANCELAR</button>
+            <button class="btn-primary" onclick="salvarIPs()">GRAVAR</button>
+        </div>
+    </div>
+</div>

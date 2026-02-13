@@ -1,0 +1,62 @@
+<div id="helioBase" class="screen">
+    <div class="form-section">
+        <div class="section-title">Gerenciamento dos Heliostatos</div>
+        
+        <input type="hidden" id="baseId">
+
+        <div class="form-row">
+            <div style="grid-column: 1 / -1;">
+                <div class="form-label">Selecione um heliostato para Editar</div>
+                <select id="baseSelect" class="form-input" onchange="carregarBaseSelecionada()">
+                    <option value="">-- Nova Base --</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div style="grid-column: 1 / -1;">
+                <div class="form-label">Número do Heliostato (ID 1-50)</div>
+                <input type="number" class="form-input" id="baseNome" placeholder="Ex: 1" min="1" max="50" onchange="validarRange(this)">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">Endereço IP</div>
+                <input type="text" class="form-input" id="baseIp" placeholder="192.168.x.x">
+            </div>
+            <div>
+                <div class="form-label">Porta</div>
+                <input type="number" class="form-input" id="basePort" value="502">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div>
+                <div class="form-label">Ângulo Alpha (α)</div>
+                <input type="number" step="0.01" class="form-input" id="baseAlpha" placeholder="0.0">
+            </div>
+            <div>
+                <div class="form-label">Ângulo Beta (β)</div>
+                <input type="number" step="0.01" class="form-input" id="baseBeta" placeholder="0.0">
+            </div>
+            <div>
+                <div class="form-label">Ângulo Theta (θ)</div>
+                <input type="number" step="0.01" class="form-input" id="baseTheta" placeholder="0.0">
+            </div>
+        </div>
+                <script>
+                    // Validação simples para manter entre 1 e 50
+                    function validarRange(el) {
+                        if(el.value < 1) el.value = 1;
+                        if(el.value > 50) el.value = 50;
+                    }
+                </script>
+
+        <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn-secondary" onclick="resetFormBase()">LIMPAR / NOVO</button>
+            <button class="btn-danger" onclick="apagarBase()">EXCLUIR</button>
+            <button class="btn-primary" onclick="salvarBase()">SALVAR ALTERAÇÕES</button>
+        </div>
+    </div>
+</div>

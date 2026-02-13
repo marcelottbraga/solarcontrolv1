@@ -1,0 +1,99 @@
+<div id="users" class="screen">
+    <div class="form-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="section-title" style="margin: 0;">Gerenciamento de Usuários</div>
+            <button class="btn-primary" onclick="abrirModalUsuario()">+ NOVO USUÁRIO</button>
+        </div>
+
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; color: #ddd;">
+                <thead>
+                    <tr style="background: rgba(255,255,255,0.05); color: #888;">
+                        <th style="padding: 12px; text-align: left;">ID</th>
+                        <th style="padding: 12px; text-align: left;">Nome</th>
+                        <th style="padding: 12px; text-align: left;">Usuário</th>
+                        <th style="padding: 12px; text-align: left;">Perfil</th>
+                        <th style="padding: 12px; text-align: center;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaUsuariosBody">
+                    {% for u in users %}
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 12px;">{{ u.id }}</td>
+                        <td style="padding: 12px; font-weight: bold;">{{ u.nome }}</td>
+                        <td style="padding: 12px; color: #aaa;">{{ u.usuario }}</td>
+                        <td style="padding: 12px;">
+                            {% if u.perfil == 'Administrador' %}
+                                <span style="background: #00d084; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">Administrador</span>
+                            {% elif u.perfil == 'Visualizador' %}
+                                <span style="background: #00a8ff; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">Visualizador</span>
+                            {% else %}
+                                <span style="background: #444; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">{{ u.perfil }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.8em;" 
+                                onclick="editarUsuario('{{ u.id }}', '{{ u.nome }}', '{{ u.usuario }}', '{{ u.email }}', '{{ u.perfil }}')">
+                                ✏️
+                            </button>
+                            <button class="btn-danger" style="padding: 4px 10px; font-size: 0.8em; margin-left: 5px;" 
+                                onclick="apagarUsuario('{{ u.id }}', '{{ u.usuario }}')">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="modalUserConfig" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: #1e1e1e; padding: 25px; border-radius: 8px; width: 500px; border: 1px solid #333;">
+            <div class="section-title" id="modalUserTitle">Novo Usuário</div>
+            
+            <input type="hidden" id="editUserId">
+
+            <div class="form-row">
+                <div style="grid-column: 1 / -1;">
+                    <div class="form-label">Nome Completo</div>
+                    <input type="text" id="inputUserNome" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+            
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="form-label">Usuário (Login)</div>
+                    <input type="text" id="inputUserLogin" class="form-input" style="width: 100%;">
+                </div>
+                <div>
+                    <div class="form-label">Perfil Usuário</div>
+                    <select id="inputUserProfile" class="form-input" style="width: 100%;">
+                        <option value="Administrador">Administrador</option>
+                        <option value="Operador">Operador</option>
+                        <option value="Visualizador">Visualizador</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div style="grid-column: 1 / -1;">
+                    <div class="form-label">E-mail</div>
+                    <input type="email" id="inputUserEmail" class="form-input" style="width: 100%;">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div style="grid-column: 1 / -1;">
+                    <div class="form-label">Senha</div>
+                    <input type="password" id="inputUserPass" class="form-input" placeholder="Deixe vazio para manter a atual" style="width: 100%;">
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 20px; justify-content: flex-end;">
+                <button class="btn-secondary" onclick="fecharModalUsuario()" style="margin-right: 10px;">Cancelar</button>
+                <button class="btn-primary" onclick="salvarUsuario()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
