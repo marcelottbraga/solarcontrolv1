@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, Response, current_app
+from flask import Blueprint, render_template, request, jsonify, Response, current_app, session
 from extensions import db
 from models import Usuario, HelioBase, LogAlarme, LogEvento, HistoricoTermopares, Historico
 import services
@@ -25,6 +25,11 @@ def login():
     user = Usuario.query.filter_by(usuario=username).first()
     
     if user and user.senha == password:
+        # --- CORREÇÃO: GRAVAR NA SESSÃO ---
+        session['usuario_id'] = user.id
+        session['nome'] = user.nome
+        session['perfil'] = user.perfil
+        
         services.registrar_evento(current_app._get_current_object(), user.nome, "LOGIN", "Login realizado")
         return jsonify({"ok": True, "nome": user.nome, "perfil": user.perfil})
     
@@ -41,10 +46,28 @@ def logout():
 # APIs de dados
 @bp.route("/api/dados")
 def api_dados():
-    dados = services.ler_dados_estacao() 
-    if dados:
-        return jsonify({"ok": True, **dados})
-    return jsonify({"ok": False, "erro": "erro_leitura"})
+    # Busca o último registro no Banco de Dados (seguro para concorrência)
+    ultimo = Historico.query.order_by(Historico.data_hora.desc()).first()
+    
+    if ultimo:
+        return jsonify({
+            "ok": True,
+            "v_bat": ultimo.v_bat,
+            "ghi1": ultimo.ghi1,
+            "dhi": ultimo.dhi,
+            "bni": ultimo.bni,
+            "old": ultimo.old,
+            "lwd": ultimo.lwd,
+            "vento_vel": ultimo.vento_vel,
+            "vento_dir": ultimo.vento_dir,
+            "temp_ar": ultimo.temp_ar,
+            "umidade_rel": ultimo.umidade_rel,
+            "pressao_atm": ultimo.pressao_atm,
+            "chuva_acum": ultimo.chuva_acum,
+            "ghi2": ultimo.ghi2,
+            "data_hora": ultimo.data_hora.strftime("%d/%m/%Y %H:%M:%S")
+        })
+    return jsonify({"ok": False, "erro": "Aguardando primeira leitura..."})
 
 @bp.route("/api/termostatos")
 def api_termostatos():
@@ -561,3 +584,73 @@ def api_comando_heliostato(id_helio):
     valores = data.get('valores')
     res = services.enviar_comando_heliostato(id_helio, tipo, valores)
     return jsonify(res)
+
+    # --- NOVAS ROTAS DE CONFIGURAÇÃO ---
+
+# 1. Salvar limites de alarme da Estação
+@bp.route('/api/config/limites/salvar', methods=['POST'])
+def api_salvar_limites_clima():
+    # Segurança: Apenas Admins
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado: Apenas administradores.'}), 403
+
+    try:
+        data = request.get_json()
+        key = data.get('key')
+        v_min = data.get('min')
+        v_max = data.get('max')
+        
+        if not key: return jsonify({'ok': False, 'erro': 'Chave inválida'}), 400
+        
+        config = services.carregar_config()
+        if not config.has_section('ESTACAO'):
+            config.add_section('ESTACAO')
+            
+        if v_min is not None: config.set('ESTACAO', f'{key}_min', str(v_min))
+        else: config.remove_option('ESTACAO', f'{key}_min')
+
+        if v_max is not None: config.set('ESTACAO', f'{key}_max', str(v_max))
+        else: config.remove_option('ESTACAO', f'{key}_max')
+        
+        # --- CORREÇÃO DO NOME DA FUNÇÃO ---
+        services.salvar_config_arquivo(config)
+        
+        return jsonify({'ok': True})
+
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)}), 500
+
+
+# 2. Salvar Configurações Gerais (Tela Sistema)
+@bp.route('/api/config/salvar', methods=['POST'])
+def api_salvar_config_geral():
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado: Apenas administradores.'}), 403
+
+    data = request.get_json()
+    tempo_estacao = data.get('tempo_estacao')
+    tempo_term = data.get('tempo_termostatos')
+    
+    try:
+        config = services.carregar_config()
+        
+        if tempo_estacao:
+            config.set('TEMPOS', 'intervalo_gravacao_estacao_segundos', str(tempo_estacao))
+        if tempo_term:
+            config.set('TEMPOS', 'intervalo_gravacao_termostatos_minutos', str(tempo_term))
+            
+        # --- CORREÇÃO DO NOME DA FUNÇÃO ---
+        services.salvar_config_arquivo(config)
+        
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
+# Buscar limites atuais (Para preencher o modal da engrenagem)
+@bp.route('/api/config/limites/<key>')
+def api_get_limites_clima(key):
+    config = services.carregar_config()
+    v_min = config.getfloat('ESTACAO', f'{key}_min', fallback=None)
+    v_max = config.getfloat('ESTACAO', f'{key}_max', fallback=None)
+    return jsonify({'ok': True, 'min': v_min, 'max': v_max})
+

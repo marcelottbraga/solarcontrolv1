@@ -24,19 +24,26 @@ class Usuario(db.Model):
             "perfil": self.perfil
         }
 
-# Modelo: Histórico da estação
+# Modelo: Histórico da estação (Atualizado conforme interface Modbus do fornecedor)
 class Historico(db.Model):
     __tablename__ = 'historico_clima'
     
     id = db.Column(db.Integer, primary_key=True)
     data_hora = db.Column(db.DateTime, default=datetime.now)
     
-    dni = db.Column(db.Integer)
-    ghi = db.Column(db.Integer)
-    vento_velocidade = db.Column(db.Float)
-    vento_direcao = db.Column(db.Integer)
-    precipitacao = db.Column(db.Float)
-    taxa_chuva = db.Column(db.Float)
+    v_bat = db.Column(db.Float)          # Tensão da Bateria (V) - Reg 40001
+    ghi1 = db.Column(db.Float)           # GHI1 (W/m²) - Reg 40003
+    dhi = db.Column(db.Float)            # DHI (W/m²) - Reg 40005
+    bni = db.Column(db.Float)            # BNI (W/m²) - Reg 40007
+    old = db.Column(db.Float)            # OLD (W/m²) - Reg 40009
+    lwd = db.Column(db.Float)            # LWD (W/m²) - Reg 40011
+    vento_vel = db.Column(db.Float)      # Vel (m/s) - Reg 40013
+    vento_dir = db.Column(db.Float)      # Dir (deg) - Reg 40015
+    temp_ar = db.Column(db.Float)        # Temp (°C) - Reg 40017
+    umidade_rel = db.Column(db.Float)    # UR (%) - Reg 40019
+    pressao_atm = db.Column(db.Float)    # Pres (mbar) - Reg 40021
+    chuva_acum = db.Column(db.Float)     # Chuva (mm) - Reg 40023
+    ghi2 = db.Column(db.Float)           # GHI2 (W/m²) - Reg 40025
 
 # Modelo: Histórico dos termopares
 class HistoricoTermopares(db.Model):

@@ -7,6 +7,7 @@ from routes import bp as routes_bp
 import services
 
 app = Flask(__name__)
+app.secret_key = 'segredo_metalwize_heliot_2024'
 
 # --- CONFIGURAÇÃO ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

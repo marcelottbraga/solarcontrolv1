@@ -7,6 +7,8 @@ import configparser
 import csv
 import io
 import threading
+from pymodbus.constants import Endian
+from pymodbus.payload import BinaryPayloadDecoder
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
 from sqlalchemy import or_
@@ -68,57 +70,70 @@ def registrar_evento(app_instance, usuario, tipo, detalhes):
 
 def ler_dados_estacao():
     config = carregar_config()
-    ip = config.get('SISTEMA', 'ip_estacao_meteo', fallback='127.0.0.1')
-    porta = config.getint('SISTEMA', 'port_estacao_meteo', fallback=1502)
+    ip = config.get('SISTEMA', 'ip_estacao_meteo', fallback='143.107.188.66')
+    porta = config.getint('SISTEMA', 'port_estacao_meteo', fallback=502)
+    slave_id = 1  # Conforme planilha
     
     client = ModbusTcpClient(ip, port=porta)
     dados = {}
     
     if client.connect():
         try:
-            # Lê 10 registradores (0 a 9)
-            rr = client.read_holding_registers(address=1, count=10, slave=1) # Mics: adicionado slave=1 e alterado o address de 0 para 1
+            # Lê 26 registradores (13 variáveis * 2 registradores de 16-bit cada)
+            # Endereço 0 corresponde ao 40001
+            rr = client.read_holding_registers(address=0, count=26, slave=slave_id)
+            
             if not rr.isError():
-                regs = rr.registers
+                # Decodifica os bytes brutos para Float 32-bit
+                decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Big)
+                
                 dados = {
-                    'dni': regs[0],
-                    'ghi': regs[1],
-                    'vento_velocidade': regs[2],
-                    'vento_direcao': regs[3],
-                    'precipitacao': regs[4],
-                    'taxa_chuva': regs[5],
-                    # NOVOS PARÂMETROS ADICIONADOS:
-                    'dhi': regs[6],          # Radiação Difusa
-                    'temperatura': regs[7],  # Temperatura Ambiente
-                    'umidade': regs[8],      # Umidade Relativa
-                    'pressao': regs[9]       # Pressão Atmosférica
+                    'v_bat': round(decoder.decode_32bit_float(), 2),       # 40001-40002
+                    'ghi1': round(decoder.decode_32bit_float(), 2),        # 40003-40004
+                    'dhi': round(decoder.decode_32bit_float(), 2),         # 40005-40006
+                    'bni': round(decoder.decode_32bit_float(), 2),         # 40007-40008
+                    'old': round(decoder.decode_32bit_float(), 2),         # 40009-40010
+                    'lwd': round(decoder.decode_32bit_float(), 2),         # 40011-40012
+                    'vento_vel': round(decoder.decode_32bit_float(), 2),   # 40013-40014
+                    'vento_dir': round(decoder.decode_32bit_float(), 2),   # 40015-40016
+                    'temp_ar': round(decoder.decode_32bit_float(), 2),     # 40017-40018
+                    'umidade_rel': round(decoder.decode_32bit_float(), 2), # 40019-40020
+                    'pressao_atm': round(decoder.decode_32bit_float(), 2), # 40021-40022
+                    'chuva_acum': round(decoder.decode_32bit_float(), 2),  # 40023-40024
+                    'ghi2': round(decoder.decode_32bit_float(), 2)         # 40025-40026
                 }
                 checar_limites_estacao(dados, config)
             else:
-                print(f"Erro Modbus: {rr}")
+                print(f"[ERRO MODBUS] Falha leitura Estação: {rr}")
                 
             client.close()
             return dados
         except Exception as e:
-            print(f"Erro leitura Modbus Estação: {e}")
+            print(f"[ERRO CRITICO] Exceção na leitura Modbus: {e}")
             client.close()
             return None
+    else:
+        print(f"[ERRO CONEXAO] Não foi possível conectar em {ip}:{porta}")
     return None
 
 def checar_limites_estacao(dados, config):
     global ultimo_alarme_registrado
     
+    # Mapeia: Chave do Dicionário de Dados -> (Chave no Config, Nome para Exibir)
     mapa = {
-        'dni': ('dni', 'DNI'), 
-        'ghi': ('ghi', 'GHI'),
-        'vento_velocidade': ('vento_velocidade', 'Vento Vel.'),
-        'vento_direcao': ('vento_direcao', 'Vento Dir.'),
-        'precipitacao': ('precipitacao', 'Precipitação'),
-        'taxa_chuva': ('taxa_chuva', 'Taxa Chuva'),
-        'dhi': ('dhi', 'Difusa'),
-        'temperatura': ('temperatura', 'Temperatura'),
-        'umidade': ('umidade', 'Umidade'),
-        'pressao': ('pressao', 'Pressão')
+        'v_bat': ('v_bat', 'Bateria (V)'),
+        'ghi1': ('ghi1', 'GHI1'),
+        'dhi': ('dhi', 'DHI'),
+        'bni': ('bni', 'BNI'),
+        'old': ('old', 'OLD'),
+        'lwd': ('lwd', 'LWD'),
+        'vento_vel': ('vento_vel', 'Vel. Vento'),
+        'vento_dir': ('vento_dir', 'Dir. Vento'),
+        'temp_ar': ('temp_ar', 'Temp. Ar'),
+        'umidade_rel': ('umidade_rel', 'Umidade'),
+        'pressao_atm': ('pressao_atm', 'Pressão'),
+        'chuva_acum': ('chuva_acum', 'Chuva Acum.'),
+        'ghi2': ('ghi2', 'GHI2')
     }
 
     try:
@@ -142,7 +157,7 @@ def checar_limites_estacao(dados, config):
                 ultimo = ultimo_alarme_registrado.get(chave_dados)
                 agora = datetime.now()
                 
-                # Só grava se mudou ou passou 1 minuto
+                # Só grava se mudou ou passou 1 minuto (anti-flood)
                 if not ultimo or (agora - ultimo['tempo']).total_seconds() > 60 or ultimo['msg'] != msg_alarme:
                     novo_alarme = LogAlarme(categoria="Clima", mensagem=msg_alarme, data_hora=agora)
                     db.session.add(novo_alarme)
@@ -153,6 +168,7 @@ def checar_limites_estacao(dados, config):
     except Exception as e:
         print(f"Erro ao checar limites: {e}")
 
+
 # Threads: gravação e monitoramento
 
 def loop_gravacao_estacao(app):
@@ -162,24 +178,37 @@ def loop_gravacao_estacao(app):
                 dados = ler_dados_estacao()
                 if dados:
                     h = Historico(
-                        dni=dados.get('dni'),
-                        ghi=dados.get('ghi'),
-                        vento_velocidade=dados.get('vento_velocidade'),
-                        vento_direcao=dados.get('vento_direcao'),
-                        precipitacao=dados.get('precipitacao'),
-                        taxa_chuva=dados.get('taxa_chuva'),
+                        v_bat=dados.get('v_bat'),
+                        ghi1=dados.get('ghi1'),
+                        dhi=dados.get('dhi'),
+                        bni=dados.get('bni'),
+                        old=dados.get('old'),
+                        lwd=dados.get('lwd'),
+                        vento_vel=dados.get('vento_vel'),
+                        vento_dir=dados.get('vento_dir'),
+                        temp_ar=dados.get('temp_ar'),
+                        umidade_rel=dados.get('umidade_rel'),
+                        pressao_atm=dados.get('pressao_atm'),
+                        chuva_acum=dados.get('chuva_acum'),
+                        ghi2=dados.get('ghi2'),
                         data_hora=datetime.now()
                     )
                     db.session.add(h)
                     db.session.commit()
+                    print(f"[HISTORICO] Clima gravado: {dados.get('temp_ar')}C | {dados.get('ghi1')}W/m2")
             except Exception as e:
                 print(f"Erro thread estação: {e}")
         
         cfg = carregar_config()
-        intervalo_seg = cfg.getint('TEMPOS', 'intervalo_gravacao_estacao_minutos', fallback=300)
-        # Proteção mínima de 5 segundos
-        if intervalo_seg < 5: intervalo_seg = 5
-        time.sleep(intervalo_seg)
+        # Agora lendo diretamente em SEGUNDOS conforme padrão do sistema
+        intervalo = cfg.getint('TEMPOS', 'intervalo_gravacao_estacao_segundos', fallback=60)
+        
+        # Garante que não seja zero ou negativo para evitar loop infinito de CPU
+        if intervalo < 1: 
+            intervalo = 60
+            
+        time.sleep(intervalo)
+
 
 # [MODIFICADO] Loop Unificado: Monitora Emergência + Grava Histórico
 def loop_termostatos_e_emergencia(app):
