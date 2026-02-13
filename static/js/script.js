@@ -6,21 +6,31 @@ let currentUserLogin = 'admin';
 let currentProfile = 'Administrador'; 
 let currentCommand = null;
 let ultimoEstadoSirene = false;
-let dashboardSlots = { slot1: 'dni', slot2: 'ghi', slot3: 'vento_velocidade', slot4: 'vento_direcao' };
+let dashboardSlots = { slot1: 'bni', slot2: 'ghi1', slot3: 'vento_vel', slot4: 'vento_dir' };
 let timerModalHelio = null;
 
+
 const weatherMeta = {
-    'dni': { label: 'DNI', unit: ' W/m²', limiteKey: 'DNI' },
-    'ghi': { label: 'GHI', unit: ' W/m²', limiteKey: 'GHI' },
-    'dhi': { label: 'Difusa', unit: ' W/m²', limiteKey: 'Difusa' }, // Novo
-    'vento_direcao': { label: 'Dir. Vento', unit: '°', limiteKey: 'Direção do Vento' },
-    'vento_velocidade': { label: 'Vel. Vento', unit: ' m/s', limiteKey: 'Velocidade do Vento' },
-    'precipitacao': { label: 'Precipitação', unit: ' mm', limiteKey: 'Precipitação Acumulada' },
-    'taxa_chuva': { label: 'Taxa Chuva', unit: ' mm/h', limiteKey: 'Taxa de Chuva' },
-    'temperatura': { label: 'Temp. Ar', unit: ' °C', limiteKey: 'Temperatura' }, // Novo
-    'umidade': { label: 'Umidade', unit: ' %', limiteKey: 'Umidade' }, // Novo
-    'pressao': { label: 'Pressão', unit: ' hPa', limiteKey: 'Pressão' } // Novo
+    'ghi1': { label: 'GHI 1 (Global)', unit: ' W/m²' },
+    'bni': { label: 'BNI (Direta)', unit: ' W/m²' },
+    'dhi': { label: 'DHI (Difusa)', unit: ' W/m²' },
+    'ghi2': { label: 'GHI 2', unit: ' W/m²' },
+    'lwd': { label: 'LWD', unit: ' W/m²' },
+    'old': { label: 'OLD', unit: ' W/m²' },
+    'vento_dir': { label: 'Dir. Vento', unit: '°' },
+    'vento_vel': { label: 'Vel. Vento', unit: ' m/s' },
+    'chuva_acum': { label: 'Chuva Acum.', unit: ' mm' },
+    'temp_ar': { label: 'Temp. Ar', unit: ' °C' },
+    'umidade_rel': { label: 'Umidade', unit: ' %' },
+    'pressao_atm': { label: 'Pressão', unit: ' mbar' },
+    'v_bat': { label: 'Bateria', unit: ' V' }
 };
+
+
+
+// Variável global para saber qual alarme está sendo editado
+let currentAlarmKey = null;
+
 
 // --- CONFIGURAÇÃO DE PRIORIDADE DE ALARMES ---
 const PRIORIDADE_ALARMES = [
@@ -234,36 +244,47 @@ function updateDateTime() {
 // ================= ATUALIZAÇÃO DE DADOS DA ESTACAO =================
 
 async function atualizarDados() {
+    // Busca dados da API (que lê do banco)
     const dados = await API.getDadosEstacao();
     if (!dados.ok) return;
 
-    // 1. Atualiza a Tela "Estação Meteorológica" (Campos Fixos)
-    for (const [key, meta] of Object.entries(weatherMeta)) {
-        let idEstacao = null;
-        if (key === 'dni') idEstacao = 'dni_estacao_valor';
-        else if (key === 'ghi') idEstacao = 'ghi_estacao_valor';
-        else if (key === 'dhi') idEstacao = 'dhi_estacao_valor'; // Novo
-        else if (key === 'vento_direcao') idEstacao = 'vento_dir_estacao_valor';
-        else if (key === 'vento_velocidade') idEstacao = 'vento_vel_estacao_valor';
-        else if (key === 'precipitacao') idEstacao = 'precipitacao_estacao_valor';
-        else if (key === 'taxa_chuva') idEstacao = 'taxa_estacao_valor';
-        else if (key === 'temperatura') idEstacao = 'temperatura_estacao_valor'; // Novo
-        else if (key === 'umidade') idEstacao = 'umidade_estacao_valor'; // Novo
-        else if (key === 'pressao') idEstacao = 'pressao_estacao_valor'; // Novo
+    // 1. Atualiza a Tela "Estação Meteorológica"
+    // Mapeia: Chave do JSON -> ID do elemento HTML
+    const mapaIds = {
+        'ghi1': 'val-ghi1', 'bni': 'val-bni', 'dhi': 'val-dhi', 'ghi2': 'val-ghi2',
+        'vento_vel': 'val-vento_vel', 'vento_dir': 'val-vento_dir', 
+        'chuva_acum': 'val-chuva_acum', 'lwd': 'val-lwd', 'old': 'val-old',
+        'temp_ar': 'val-temp_ar', 'umidade_rel': 'val-umidade_rel', 
+        'pressao_atm': 'val-pressao_atm', 'v_bat': 'val-v_bat'
+    };
 
-        if (idEstacao) aplicarValorComCor(idEstacao, dados[key], meta);
-    }
-
-    // 2. Atualiza o Dashboard (Slots Dinâmicos 1 a 4)
-    for (let i = 1; i <= 4; i++) {
-        const key = dashboardSlots[`slot${i}`]; 
-        const meta = weatherMeta[key];
-        if (meta) {
-            aplicarValorComCor(`dash_slot_${i}_val`, dados[key], meta);
+    for (const [key, idElemento] of Object.entries(mapaIds)) {
+        const el = document.getElementById(idElemento);
+        // Só atualiza se o elemento existir e o dado não for undefined
+        if (el && dados[key] !== undefined) {
+             el.innerText = dados[key] + (weatherMeta[key]?.unit || '');
         }
     }
+    
+    // Atualiza hora
+    const elHora = document.getElementById('val-data_hora');
+    if(elHora && dados.data_hora) elHora.innerText = dados.data_hora;
 
-    verificarAlarmesEstacao(dados);
+    // 2. Atualiza Dashboard (Slots dinâmicos)
+    for (let i = 1; i <= 4; i++) {
+        const key = dashboardSlots[`slot${i}`];
+        const meta = weatherMeta[key];
+        // Atualiza Valor
+        const elVal = document.getElementById(`dash_slot_${i}_val`);
+        if (elVal && meta && dados[key] !== undefined) {
+             elVal.innerText = dados[key] + meta.unit;
+        }
+        // Atualiza Título (caso tenha mudado)
+        const elTitle = document.getElementById(`dash_slot_${i}_title`);
+        if (elTitle && meta) {
+             elTitle.innerText = meta.label;
+        }
+    }
 }
 
 // Função Auxiliar para aplicar texto e COR (Vermelho se alarme)
@@ -388,47 +409,60 @@ async function carregarConfiguracoes() {
     const dados = await API.getConfig();
     if (!dados) return;
 
+    // 1. SISTEMA (Mantido Original)
     const sis = dados.SISTEMA;
     if (sis) {
-        setValInput('ip_estacao', sis.ip_estacao_meteo);
-        setValInput('porta_estacao', sis.port_estacao_meteo);
-        setValInput('ip_termostatos', sis.ip_termostatos);
-        setValInput('porta_termostatos', sis.port_termostatos);
-        setValInput('ip_roteador', sis.ip_roteador);
-        setValInput('porta_roteador', sis.port_roteador);
-        setValInput('ip_camera1', sis.ip_cam1);
-        setValInput('porta_camera1', sis.port_cam1);
-        setValInput('ip_camera2', sis.ip_cam2);
-        setValInput('porta_camera2', sis.port_cam2);
-		setValInput('ip_ventilador', sis.ip_ventilador);
-		setValInput('porta_ventilador', sis.port_ventilador);;
+        // Função auxiliar interna para evitar erro se o input não existir
+        const safeSet = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
+
+        safeSet('ip_estacao', sis.ip_estacao_meteo);
+        safeSet('porta_estacao', sis.port_estacao_meteo);
+        safeSet('ip_termostatos', sis.ip_termostatos);
+        safeSet('porta_termostatos', sis.port_termostatos);
+        safeSet('ip_roteador', sis.ip_roteador);
+        safeSet('porta_roteador', sis.port_roteador);
+        safeSet('ip_camera1', sis.ip_cam1);
+        safeSet('porta_camera1', sis.port_cam1);
+        safeSet('ip_camera2', sis.ip_cam2);
+        safeSet('porta_camera2', sis.port_cam2);
+        safeSet('ip_ventilador', sis.ip_ventilador);
+        safeSet('porta_ventilador', sis.port_ventilador);
     }
     
+    // 2. TEMPOS (Corrigido para ler SEGUNDOS)
     const tempos = dados.TEMPOS;
     if (tempos) {
-        setValInput('tempo_gravacao_estacao', tempos.intervalo_gravacao_estacao_minutos);
-        setValInput('tempo_gravacao_termostatos', tempos.intervalo_gravacao_termostatos_minutos);
+        const elEst = document.getElementById('tempo_gravacao_estacao');
+        // Lê a chave nova _segundos. Se não existir, usa 60.
+        if (elEst) elEst.value = tempos.intervalo_gravacao_estacao_segundos || 60;
+
+        const elTerm = document.getElementById('tempo_gravacao_termostatos');
+        if (elTerm) elTerm.value = tempos.intervalo_gravacao_termostatos_minutos;
     }
 
-    const est = dados.ESTACAO;
-    if (est) {
-        for (const [nomeLegivel, obj] of Object.entries(weatherAlarmThresholds)) {
-            const safeKey = weatherMap[nomeLegivel]; 
-            if (est[`${safeKey}_min`]) obj.min = parseFloat(est[`${safeKey}_min`]);
-            if (est[`${safeKey}_max`]) obj.max = parseFloat(est[`${safeKey}_max`]);
-        }
-    }
+    // 3. ESTACAO (Removido)
+    // Motivo: Os alarmes agora são configurados nas Engrenagens, 
+    // os inputs não existem mais nesta tela, o que causava erro.
 
+    // 4. TERMOSTATOS (Mantido Original com proteção)
     const term = dados.TERMOSTATOS;
     if (term) {
-        sensorConfig.min = parseFloat(term.temp_min);
-        sensorConfig.max = parseFloat(term.temp_max);
-        sensorConfig.tolerance = parseInt(term.num_sensores_alarm);
-        sensorConfig.alarmBelowMin = (term.toggle_ativa_min === 'true');
+        // Verifica se sensorConfig existe antes de usar
+        if (typeof sensorConfig !== 'undefined') {
+            sensorConfig.min = parseFloat(term.temp_min);
+            sensorConfig.max = parseFloat(term.temp_max);
+            sensorConfig.tolerance = parseInt(term.num_sensores_alarm);
+            sensorConfig.alarmBelowMin = (term.toggle_ativa_min === 'true');
+        }
         
-        setValInput('tempMinHeatmap', term.temp_min);
-        setValInput('tempMaxHeatmap', term.temp_max);
-        setValInput('numsensout', term.num_sensores_alarm);
+        const safeSet = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+        
+        safeSet('tempMinHeatmap', term.temp_min);
+        safeSet('tempMaxHeatmap', term.temp_max);
+        safeSet('numsensout', term.num_sensores_alarm);
 
         const radioSim = document.querySelector('input[name="alarmBelowMin"][value="sim"]');
         const radioNao = document.querySelector('input[name="alarmBelowMin"][value="nao"]');
@@ -437,19 +471,33 @@ async function carregarConfiguracoes() {
             else radioNao.checked = true;
         }
     }
-    const dash = dados.DASHBOARD_DISPLAY;
-    if (dash) {
-        if(dash.slot1) document.getElementById('cfg_dash_slot1').value = dash.slot1;
-        if(dash.slot2) document.getElementById('cfg_dash_slot2').value = dash.slot2;
-        if(dash.slot3) document.getElementById('cfg_dash_slot3').value = dash.slot3;
-        if(dash.slot4) document.getElementById('cfg_dash_slot4').value = dash.slot4;
-        
-        // Atualiza a global e os títulos imediatamente
-        dashboardSlots.slot1 = dash.slot1 || 'dni';
-        dashboardSlots.slot2 = dash.slot2 || 'ghi';
-        dashboardSlots.slot3 = dash.slot3 || 'vento_velocidade';
-        dashboardSlots.slot4 = dash.slot4 || 'vento_direcao';
-        
+
+    // 5. DASHBOARD (Corrigido IDs e Variáveis)
+    // Tenta carregar do LocalStorage primeiro (mais rápido), senão do backend
+    const savedSlots = localStorage.getItem('dashboard_slots');
+    if (savedSlots) {
+        try {
+            const parsed = JSON.parse(savedSlots);
+            dashboardSlots = parsed;
+        } catch(e) {}
+    } else {
+        // Se não tiver no storage, usa o padrão novo
+        dashboardSlots = { slot1: 'bni', slot2: 'ghi1', slot3: 'vento_vel', slot4: 'vento_dir' };
+    }
+
+    // Atualiza os selects na tela (usando os IDs corretos: dash_slot_1)
+    const updateSelect = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+
+    updateSelect('dash_slot_1', dashboardSlots.slot1);
+    updateSelect('dash_slot_2', dashboardSlots.slot2);
+    updateSelect('dash_slot_3', dashboardSlots.slot3);
+    updateSelect('dash_slot_4', dashboardSlots.slot4);
+    
+    // Atualiza a visualização se a função existir
+    if (typeof atualizarTitulosDashboard === 'function') {
         atualizarTitulosDashboard();
     }
 }
@@ -1825,6 +1873,151 @@ function fecharModalHeliostato() {
     }
 }
 
+// Abre o modal de configuração de alarmes
+// --- FUNÇÕES DOS MODAIS DA ESTAÇÃO ---
+
+// Abre o modal ao clicar na engrenagem
+async function openWeatherAlarmModal(key, unit) {
+    const meta = weatherMeta[key];
+    if (!meta) return;
+
+    currentAlarmKey = key; 
+
+    // Atualiza título do Modal
+    const elTitle = document.getElementById('weatherAlarmTitle');
+    if (elTitle) elTitle.innerText = `Configurar: ${meta.label}`;
+
+    // Limpa campos
+    document.getElementById('weatherAlarmMin').value = '';
+    document.getElementById('weatherAlarmMax').value = '';
+
+    // Busca limites salvos
+    try {
+        const resp = await fetch(`/api/config/limites/${key}`);
+        const data = await resp.json();
+        if (data.ok) {
+            if (data.min !== null) document.getElementById('weatherAlarmMin').value = data.min;
+            if (data.max !== null) document.getElementById('weatherAlarmMax').value = data.max;
+        }
+    } catch (e) {
+        console.error("Erro ao buscar limites", e);
+    }
+
+    // Mostra o Modal (Centralizado pelo CSS novo)
+    const modal = document.getElementById('weatherAlarmModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+// Fecha o modal
+function closeWeatherAlarmModal() {
+    const modal = document.getElementById('weatherAlarmModal');
+    if (modal) modal.style.display = 'none';
+}
+
+// Salva os limites
+async function saveWeatherAlarmThresholds() {
+    if (!currentAlarmKey) return;
+
+    const minVal = document.getElementById('weatherAlarmMin').value;
+    const maxVal = document.getElementById('weatherAlarmMax').value;
+
+    const payload = {
+        key: currentAlarmKey,
+        min: minVal === '' ? null : parseFloat(minVal),
+        max: maxVal === '' ? null : parseFloat(maxVal)
+    };
+
+    try {
+        const resp = await fetch('/api/config/limites/salvar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        
+        if(data.ok) {
+            alert("Salvo com sucesso!");
+            closeWeatherAlarmModal();
+        } else {
+            alert("Erro ao salvar: " + (data.erro || 'Erro desconhecido'));
+        }
+    } catch (e) {
+        alert("Erro de comunicação.");
+    }
+}
+
+// Função do Botão "Gravar" (Tela Sistema)
+async function salvarConfiguracoesGerais() {
+    const tEstacao = document.getElementById('tempo_gravacao_estacao').value;
+    const tTerm = document.getElementById('tempo_gravacao_termostatos').value;
+    
+    // Payload compatível com a rota existente
+    const payload = {
+        'TEMPOS': {
+            'intervalo_gravacao_estacao_segundos': tEstacao,
+            'intervalo_gravacao_termostatos_minutos': tTerm
+        },
+        'usuario': currentUser
+    };
+
+    const res = await API.salvarConfig(payload);
+    if (res.ok) alert("Configurações salvas!");
+    else alert("Erro: " + res.erro);
+}
+
+// Garante que o botão da tela Sistema chame a função correta
+document.addEventListener('DOMContentLoaded', () => {
+    const btnGravarSistema = document.querySelector('#system .btn-primary');
+    if(btnGravarSistema) {
+        btnGravarSistema.onclick = salvarConfiguracoesGerais;
+    }
+});
+
+// Função para salvar a configuração dos slots do Dashboard
+function salvarConfigDashboard() {
+    const slot1 = document.getElementById('dash_slot_1').value;
+    const slot2 = document.getElementById('dash_slot_2').value;
+    const slot3 = document.getElementById('dash_slot_3').value;
+    const slot4 = document.getElementById('dash_slot_4').value;
+
+    // Atualiza a variável global imediatamente
+    dashboardSlots = {
+        slot1: slot1,
+        slot2: slot2,
+        slot3: slot3,
+        slot4: slot4
+    };
+
+    // Salva no LocalStorage para persistir entre recargas (ou envie para o backend se preferir)
+    localStorage.setItem('dashboard_slots', JSON.stringify(dashboardSlots));
+    
+    // Atualiza o dashboard visualmente se ele estiver aberto
+    atualizarDados();
+    
+    console.log("Dashboard atualizado:", dashboardSlots);
+}
+
+// Carrega a configuração salva ao iniciar (adicione isso no final do arquivo também)
+document.addEventListener('DOMContentLoaded', () => {
+    const salvos = localStorage.getItem('dashboard_slots');
+    if (salvos) {
+        try {
+            const parsed = JSON.parse(salvos);
+            dashboardSlots = parsed;
+            // Atualiza os selects na tela Sistema se existirem
+            const s1 = document.getElementById('dash_slot_1');
+            if(s1) s1.value = parsed.slot1;
+            const s2 = document.getElementById('dash_slot_2');
+            if(s2) s2.value = parsed.slot2;
+            const s3 = document.getElementById('dash_slot_3');
+            if(s3) s3.value = parsed.slot3;
+            const s4 = document.getElementById('dash_slot_4');
+            if(s4) s4.value = parsed.slot4;
+        } catch (e) {
+            console.error("Erro ao carregar slots salvos", e);
+        }
+    }
+});
 
 // ================= START =================
 document.addEventListener('DOMContentLoaded', () => {
