@@ -112,67 +112,81 @@
             </div>
             
             <div>
-                <div class="form-label">Slot 1 (Topo Esq.)</div>
-                <select id="cfg_dash_slot1" class="form-input">
-                    <option value="dni">DNI</option>
-                    <option value="ghi">GHI</option>
-                    <option value="dhi">Difusa (DHI)</option>
-                    <option value="vento_velocidade">Velocidade Vento</option>
-                    <option value="vento_direcao">Direção Vento</option>
-                    <option value="precipitacao">Precipitação</option>
-                    <option value="taxa_chuva">Taxa de Chuva</option>
-                    <option value="temperatura">Temperatura</option>
-                    <option value="umidade">Umidade</option>
-                    <option value="pressao">Pressão</option>
-                </select>
-            </div>
+                    <div class="form-label">Slot 1 (Topo Esq)</div>
+                    <select class="form-select" id="dash_slot_1" onchange="salvarConfigDashboard()">
+                        <option value="ghi1">GHI 1 (Global)</option>
+                        <option value="bni">BNI (Direta)</option>
+                        <option value="dhi">DHI (Difusa)</option>
+                        <option value="ghi2">GHI 2</option>
+                        <option value="vento_vel">Velocidade Vento</option>
+                        <option value="vento_dir">Direção Vento</option>
+                        <option value="temp_ar">Temperatura Ar</option>
+                        <option value="umidade_rel">Umidade Relativa</option>
+                        <option value="pressao_atm">Pressão Atm</option>
+                        <option value="chuva_acum">Chuva Acumulada</option>
+                        <option value="lwd">LWD</option>
+                        <option value="old">OLD</option>
+                        <option value="v_bat">Bateria</option>
+                    </select>
+                </div>
 
-            <div>
-                <div class="form-label">Slot 2 (Topo Dir.)</div>
-                <select id="cfg_dash_slot2" class="form-input">
-                    <option value="dni">DNI</option>
-                    <option value="ghi">GHI</option>
-                    <option value="dhi">Difusa (DHI)</option>
-                    <option value="vento_velocidade">Velocidade Vento</option>
-                    <option value="vento_direcao">Direção Vento</option>
-                    <option value="precipitacao">Precipitação</option>
-                    <option value="taxa_chuva">Taxa de Chuva</option>
-                    <option value="temperatura">Temperatura</option>
-                    <option value="umidade">Umidade</option>
-                    <option value="pressao">Pressão</option>
-                </select>
-            </div>
+                <div>
+                    <div class="form-label">Slot 2 (Topo Dir)</div>
+                    <select class="form-select" id="dash_slot_2" onchange="salvarConfigDashboard()">
+                        <option value="ghi1">GHI 1 (Global)</option>
+                        <option value="bni">BNI (Direta)</option>
+                        <option value="dhi">DHI (Difusa)</option>
+                        <option value="ghi2">GHI 2</option>
+                        <option value="vento_vel">Velocidade Vento</option>
+                        <option value="vento_dir">Direção Vento</option>
+                        <option value="temp_ar">Temperatura Ar</option>
+                        <option value="umidade_rel">Umidade Relativa</option>
+                        <option value="pressao_atm">Pressão Atm</option>
+                        <option value="chuva_acum">Chuva Acumulada</option>
+                        <option value="lwd">LWD</option>
+                        <option value="old">OLD</option>
+                        <option value="v_bat">Bateria</option>
+                    </select>
+                </div>
 
-            <div>
-                <div class="form-label">Slot 3 (Base Esq.)</div>
-                <select id="cfg_dash_slot3" class="form-input">
-                    <option value="dni">DNI</option>
-                    <option value="ghi">GHI</option>
-                    <option value="dhi">Difusa (DHI)</option>
-                    <option value="vento_velocidade">Velocidade Vento</option>
-                    <option value="vento_direcao">Direção Vento</option>
-                    <option value="precipitacao">Precipitação</option>
-                    <option value="taxa_chuva">Taxa de Chuva</option>
-                    <option value="temperatura">Temperatura</option>
-                    <option value="umidade">Umidade</option>
-                    <option value="pressao">Pressão</option>
-                </select>
-            </div>
+                <div>
+                    <div class="form-label">Slot 3 (Baixo Esq)</div>
+                    <select class="form-select" id="dash_slot_3" onchange="salvarConfigDashboard()">
+                        <option value="ghi1">GHI 1 (Global)</option>
+                        <option value="bni">BNI (Direta)</option>
+                        <option value="dhi">DHI (Difusa)</option>
+                        <option value="ghi2">GHI 2</option>
+                        <option value="vento_vel">Velocidade Vento</option>
+                        <option value="vento_dir">Direção Vento</option>
+                        <option value="temp_ar">Temperatura Ar</option>
+                        <option value="umidade_rel">Umidade Relativa</option>
+                        <option value="pressao_atm">Pressão Atm</option>
+                        <option value="chuva_acum">Chuva Acumulada</option>
+                        <option value="lwd">LWD</option>
+                        <option value="old">OLD</option>
+                        <option value="v_bat">Bateria</option>
+                    </select>
+                </div>
 
-            <div>
-                <div class="form-label">Slot 4 (Base Dir.)</div>
-                <select id="cfg_dash_slot4" class="form-input">
-                    <option value="dni">DNI</option>
-                    <option value="ghi">GHI</option>
-                    <option value="dhi">Difusa (DHI)</option>
-                    <option value="vento_velocidade">Velocidade Vento</option>
-                    <option value="vento_direcao">Direção Vento</option>
-                    <option value="precipitacao">Precipitação</option>
-                    <option value="taxa_chuva">Taxa de Chuva</option>
-                    <option value="temperatura">Temperatura</option>
-                    <option value="umidade">Umidade</option>
-                    <option value="pressao">Pressão</option>    
-                </select>
+                <div>
+                    <div class="form-label">Slot 4 (Baixo Dir)</div>
+                    <select class="form-select" id="dash_slot_4" onchange="salvarConfigDashboard()">
+                        <option value="ghi1">GHI 1 (Global)</option>
+                        <option value="bni">BNI (Direta)</option>
+                        <option value="dhi">DHI (Difusa)</option>
+                        <option value="ghi2">GHI 2</option>
+                        <option value="vento_vel">Velocidade Vento</option>
+                        <option value="vento_dir">Direção Vento</option>
+                        <option value="temp_ar">Temperatura Ar</option>
+                        <option value="umidade_rel">Umidade Relativa</option>
+                        <option value="pressao_atm">Pressão Atm</option>
+                        <option value="chuva_acum">Chuva Acumulada</option>
+                        <option value="lwd">LWD</option>
+                        <option value="old">OLD</option>
+                        <option value="v_bat">Bateria</option>
+                    </select>
+                </div>
+
             </div>
         </div>
 
