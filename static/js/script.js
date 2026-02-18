@@ -8,6 +8,8 @@ let currentCommand = null;
 let ultimoEstadoSirene = false;
 let dashboardSlots = { slot1: 'bni', slot2: 'ghi1', slot3: 'vento_vel', slot4: 'vento_dir' };
 let timerModalHelio = null;
+let limitesEstacao = {};
+
 
 
 const weatherMeta = {
@@ -70,6 +72,32 @@ const weatherMap = {
     'Temperatura': 'temperatura', 'Umidade': 'umidade', 'Pressão': 'pressao'
 };
 
+// Função para restaurar o nível do usuário ao recarregar a página
+async function verificarSessao() {
+    try {
+        const resp = await fetch('/api/sessao');
+        const data = await resp.json();
+        
+        if (data.ok) {
+            // Restaura o perfil correto (Admin/Operador/Visualizador)
+            currentProfile = data.perfil; 
+            console.log("Sessão restaurada. Nível:", currentProfile);
+
+            // Atualiza a interface (Botão Sair)
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginBtn && data.nome !== 'Visitante') {
+                loginBtn.innerText = `Sair (${data.nome})`;
+            }
+            
+            // Re-aplica as regras visuais (Habilita/Desabilita botões conforme o nível)
+            if (typeof aplicarRegrasDeUsuario === 'function') {
+                aplicarRegrasDeUsuario();
+            }
+        }
+    } catch (e) {
+        console.error("Erro ao verificar sessão", e);
+    }
+}
 // ================= LOGIN E NAVEGAÇÃO =================
 async function handleLogin(event) {
     event.preventDefault();
@@ -244,12 +272,15 @@ function updateDateTime() {
 // ================= ATUALIZAÇÃO DE DADOS DA ESTACAO =================
 
 async function atualizarDados() {
-    // Busca dados da API (que lê do banco)
+    // Busca dados da API (que lê do Modbus/Banco)
     const dados = await API.getDadosEstacao();
-    if (!dados.ok) return;
+    
+    // Se não tiver o 'ok' (proteção contra dados vazios), para aqui
+    if (!dados || dados.ok === false) return;
 
-    // 1. Atualiza a Tela "Estação Meteorológica"
-    // Mapeia: Chave do JSON -> ID do elemento HTML
+    // Zera lista de alarmes visuais para recalcular
+    if(typeof alarmesGlobais !== 'undefined') alarmesGlobais.estacao = [];
+
     const mapaIds = {
         'ghi1': 'val-ghi1', 'bni': 'val-bni', 'dhi': 'val-dhi', 'ghi2': 'val-ghi2',
         'vento_vel': 'val-vento_vel', 'vento_dir': 'val-vento_dir', 
@@ -259,10 +290,38 @@ async function atualizarDados() {
     };
 
     for (const [key, idElemento] of Object.entries(mapaIds)) {
-        const el = document.getElementById(idElemento);
-        // Só atualiza se o elemento existir e o dado não for undefined
-        if (el && dados[key] !== undefined) {
-             el.innerText = dados[key] + (weatherMeta[key]?.unit || '');
+        const valor = dados[key];
+        
+        // Só processa se houver valor numérico válido
+        if (valor !== undefined && valor !== null) {
+            const meta = weatherMeta[key];
+            const texto = valor + (meta?.unit || '');
+            
+            // --- LÓGICA DE ALARME SIMPLIFICADA ---
+            let emAlarme = false;
+            
+            // Busca os limites na memória (carregados do heliot.config)
+            const min = parseFloat(limitesEstacao[`${key}_min`]);
+            const max = parseFloat(limitesEstacao[`${key}_max`]);
+
+            // Compara (apenas se os limites existirem e forem números)
+            if (!isNaN(min) && valor < min) emAlarme = true;
+            if (!isNaN(max) && valor > max) emAlarme = true;
+            
+            // Se estiver em alarme, adiciona na lista global (para o topo da tela)
+            if (emAlarme && typeof alarmesGlobais !== 'undefined') {
+                alarmesGlobais.estacao.push(`${meta.label} fora do limite`);
+            }
+            // -------------------------------------
+
+            // 1. Atualiza Tela da Estação
+            const el = document.getElementById(idElemento);
+            if (el) {
+                el.innerText = texto;
+                // Pinta de VERMELHO se estiver em alarme
+                el.style.color = emAlarme ? '#ff4444' : 'var(--color-accent)';
+                el.style.fontWeight = emAlarme ? '800' : 'bold';
+            }
         }
     }
     
@@ -270,20 +329,37 @@ async function atualizarDados() {
     const elHora = document.getElementById('val-data_hora');
     if(elHora && dados.data_hora) elHora.innerText = dados.data_hora;
 
-    // 2. Atualiza Dashboard (Slots dinâmicos)
+    // 2. Atualiza Dashboard (Slots dinâmicos) com a mesma lógica de cor
     for (let i = 1; i <= 4; i++) {
         const key = dashboardSlots[`slot${i}`];
+        if(!key) continue;
+        
+        const valor = dados[key];
         const meta = weatherMeta[key];
-        // Atualiza Valor
-        const elVal = document.getElementById(`dash_slot_${i}_val`);
-        if (elVal && meta && dados[key] !== undefined) {
-             elVal.innerText = dados[key] + meta.unit;
+        
+        if (valor !== undefined && meta) {
+            const elVal = document.getElementById(`dash_slot_${i}_val`);
+            const elTitle = document.getElementById(`dash_slot_${i}_title`);
+            
+            if (elVal) {
+                elVal.innerText = valor + meta.unit;
+                
+                // Reaplica verificação de cor aqui também
+                const min = parseFloat(limitesEstacao[`${key}_min`]);
+                const max = parseFloat(limitesEstacao[`${key}_max`]);
+                let emAlarme = false;
+                if (!isNaN(min) && valor < min) emAlarme = true;
+                if (!isNaN(max) && valor > max) emAlarme = true;
+                
+                elVal.style.color = emAlarme ? '#ff4444' : 'var(--color-accent)';
+            }
+            if (elTitle) elTitle.innerText = meta.label;
         }
-        // Atualiza Título (caso tenha mudado)
-        const elTitle = document.getElementById(`dash_slot_${i}_title`);
-        if (elTitle && meta) {
-             elTitle.innerText = meta.label;
-        }
+    }
+
+    // Atualiza o painel de alarmes global no topo
+    if (typeof atualizarInterfaceAlarmes === 'function') {
+        atualizarInterfaceAlarmes();
     }
 }
 
@@ -409,15 +485,15 @@ async function carregarConfiguracoes() {
     const dados = await API.getConfig();
     if (!dados) return;
 
-    // 1. SISTEMA (Mantido Original)
+    // Pega os limites (min/max) direto do heliot.config e salva na memória
+    if (dados.ESTACAO) {
+        limitesEstacao = dados.ESTACAO;
+    }
+
+    // 1. SISTEMA
     const sis = dados.SISTEMA;
     if (sis) {
-        // Função auxiliar interna para evitar erro se o input não existir
-        const safeSet = (id, val) => {
-            const el = document.getElementById(id);
-            if (el) el.value = val;
-        };
-
+        const safeSet = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
         safeSet('ip_estacao', sis.ip_estacao_meteo);
         safeSet('porta_estacao', sis.port_estacao_meteo);
         safeSet('ip_termostatos', sis.ip_termostatos);
@@ -432,34 +508,26 @@ async function carregarConfiguracoes() {
         safeSet('porta_ventilador', sis.port_ventilador);
     }
     
-    // 2. TEMPOS (Corrigido para ler SEGUNDOS)
+    // 2. TEMPOS
     const tempos = dados.TEMPOS;
     if (tempos) {
         const elEst = document.getElementById('tempo_gravacao_estacao');
-        // Lê a chave nova _segundos. Se não existir, usa 60.
         if (elEst) elEst.value = tempos.intervalo_gravacao_estacao_segundos || 60;
 
         const elTerm = document.getElementById('tempo_gravacao_termostatos');
         if (elTerm) elTerm.value = tempos.intervalo_gravacao_termostatos_minutos;
     }
 
-    // 3. ESTACAO (Removido)
-    // Motivo: Os alarmes agora são configurados nas Engrenagens, 
-    // os inputs não existem mais nesta tela, o que causava erro.
-
-    // 4. TERMOSTATOS (Mantido Original com proteção)
+    // 3. TERMOSTATOS
     const term = dados.TERMOSTATOS;
     if (term) {
-        // Verifica se sensorConfig existe antes de usar
         if (typeof sensorConfig !== 'undefined') {
             sensorConfig.min = parseFloat(term.temp_min);
             sensorConfig.max = parseFloat(term.temp_max);
             sensorConfig.tolerance = parseInt(term.num_sensores_alarm);
             sensorConfig.alarmBelowMin = (term.toggle_ativa_min === 'true');
         }
-        
         const safeSet = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
-        
         safeSet('tempMinHeatmap', term.temp_min);
         safeSet('tempMaxHeatmap', term.temp_max);
         safeSet('numsensout', term.num_sensores_alarm);
@@ -472,33 +540,28 @@ async function carregarConfiguracoes() {
         }
     }
 
-    // 5. DASHBOARD (Corrigido IDs e Variáveis)
-    // Tenta carregar do LocalStorage primeiro (mais rápido), senão do backend
-    const savedSlots = localStorage.getItem('dashboard_slots');
-    if (savedSlots) {
-        try {
-            const parsed = JSON.parse(savedSlots);
-            dashboardSlots = parsed;
-        } catch(e) {}
-    } else {
-        // Se não tiver no storage, usa o padrão novo
-        dashboardSlots = { slot1: 'bni', slot2: 'ghi1', slot3: 'vento_vel', slot4: 'vento_dir' };
-    }
+    // 4. DASHBOARD (CORREÇÃO AQUI: Ler do arquivo, não do cache)
+    const dash = dados.DASHBOARD_DISPLAY;
+    if (dash) {
+        // Atualiza a variável global com o que veio do arquivo
+        dashboardSlots.slot1 = dash.slot1 || 'bni';
+        dashboardSlots.slot2 = dash.slot2 || 'ghi1';
+        dashboardSlots.slot3 = dash.slot3 || 'vento_vel';
+        dashboardSlots.slot4 = dash.slot4 || 'vento_dir';
 
-    // Atualiza os selects na tela (usando os IDs corretos: dash_slot_1)
-    const updateSelect = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
-    };
+        // Atualiza os Dropdowns na tela Sistema (IDs: cfg_dash_slot...)
+        const safeSetDash = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+        safeSetDash('cfg_dash_slot1', dashboardSlots.slot1);
+        safeSetDash('cfg_dash_slot2', dashboardSlots.slot2);
+        safeSetDash('cfg_dash_slot3', dashboardSlots.slot3);
+        safeSetDash('cfg_dash_slot4', dashboardSlots.slot4);
 
-    updateSelect('dash_slot_1', dashboardSlots.slot1);
-    updateSelect('dash_slot_2', dashboardSlots.slot2);
-    updateSelect('dash_slot_3', dashboardSlots.slot3);
-    updateSelect('dash_slot_4', dashboardSlots.slot4);
-    
-    // Atualiza a visualização se a função existir
-    if (typeof atualizarTitulosDashboard === 'function') {
-        atualizarTitulosDashboard();
+        // Força atualização visual imediata
+        if (typeof atualizarTitulosDashboard === 'function') {
+            atualizarTitulosDashboard();
+        }
+        // Atualiza os valores também
+        atualizarDados();
     }
 }
 
@@ -514,53 +577,65 @@ function atualizarTitulosDashboard() {
     }
 }
 
+// Função do Botão "GRAVAR" da tela Sistema
 async function salvarIPs() {
     const tEstacao = document.getElementById('tempo_gravacao_estacao').value;
-    const tTermostatos = document.getElementById('tempo_gravacao_termostatos').value;
+    const tTerm = document.getElementById('tempo_gravacao_termostatos').value;
 
-    if (!tEstacao || isNaN(tEstacao) || !Number.isInteger(Number(tEstacao)) || Number(tEstacao) <= 0) {
-        return alert("Erro: O intervalo da Estação deve ser inteiro em SEGUNDOS.");
-    }
-    if (!tTermostatos || isNaN(tTermostatos) || !Number.isInteger(Number(tTermostatos)) || Number(tTermostatos) <= 0) {
-        return alert("Erro: O intervalo dos Termostatos deve ser inteiro em SEGUNDOS.");
-    }
+    // Validação básica
+    if (!tEstacao || tEstacao <= 0) return alert("Tempo da Estação inválido.");
+    if (!tTerm || tTerm <= 0) return alert("Tempo dos Termostatos inválido.");
+
+    // Função auxiliar para pegar valor
+    const getVal = (id) => { 
+        const el = document.getElementById(id); 
+        return el ? el.value : ''; 
+    };
 
     const payload = {
-        usuario_solicitante: currentUserLogin, // NOVO: Validação backend
-        usuario: currentUser, // Log visual
-        sistema: {
-            ip_estacao_meteo: document.getElementById('ip_estacao').value,
-            port_estacao_meteo: document.getElementById('porta_estacao').value,
-            ip_termostatos: document.getElementById('ip_termostatos').value,
-            port_termostatos: document.getElementById('porta_termostatos').value,
-            ip_roteador: document.getElementById('ip_roteador').value,
-            port_roteador: document.getElementById('porta_roteador').value,
-            ip_ventilador: document.getElementById('ip_ventilador').value,
-            port_ventilador: document.getElementById('porta_ventilador').value,
-            ip_cam1: document.getElementById('ip_camera1').value,
-            port_cam1: document.getElementById('porta_camera1').value,
-            ip_cam2: document.getElementById('ip_camera2').value,
-            port_cam2: document.getElementById('porta_camera2').value
+        usuario_solicitante: currentUserLogin,
+        usuario: currentUser,
+        
+        // SEÇÃO 1: SISTEMA (IPs e Portas)
+        SISTEMA: {
+            ip_estacao_meteo: getVal('ip_estacao'),
+            port_estacao_meteo: getVal('porta_estacao'),
+            ip_termostatos: getVal('ip_termostatos'),
+            port_termostatos: getVal('porta_termostatos'),
+            ip_roteador: getVal('ip_roteador'),
+            port_roteador: getVal('porta_roteador'),
+            ip_ventilador: getVal('ip_ventilador'),
+            port_ventilador: getVal('porta_ventilador'),
+            ip_cam1: getVal('ip_camera1'),
+            port_cam1: getVal('porta_camera1'),
+            ip_cam2: getVal('ip_camera2'),
+            port_cam2: getVal('porta_camera2')
         },
-        tempos: {
-            intervalo_gravacao_estacao_minutos: tEstacao, 
-            intervalo_gravacao_termostatos_minutos: tTermostatos
+
+        // SEÇÃO 2: TEMPOS
+        TEMPOS: {
+            intervalo_gravacao_estacao_segundos: tEstacao,
+            intervalo_gravacao_termostatos_minutos: tTerm
         },
-        dashboard_display: {
-            slot1: document.getElementById('cfg_dash_slot1').value,
-            slot2: document.getElementById('cfg_dash_slot2').value,
-            slot3: document.getElementById('cfg_dash_slot3').value,
-            slot4: document.getElementById('cfg_dash_slot4').value
+
+        // SEÇÃO 3: DASHBOARD (Usa os IDs corretos dash_slot_X)
+        DASHBOARD_DISPLAY: {
+            slot1: getVal('dash_slot_1'),
+            slot2: getVal('dash_slot_2'),
+            slot3: getVal('dash_slot_3'),
+            slot4: getVal('dash_slot_4')
         }
     };
 
+    // Envia para o servidor
     const d = await API.salvarConfig(payload);
     if (d.ok) {
-        alert('Configurações salvas!');
-        carregarConfiguracoes();
+        alert('Configurações do Sistema Salvas!');
+        carregarConfiguracoes(); // Recarrega para confirmar
     } else {
         alert('Erro ao salvar: ' + d.erro);
     }
+
 }
 
 async function salvarConfiguracoesTermostatos() {
@@ -1877,33 +1952,34 @@ function fecharModalHeliostato() {
 // --- FUNÇÕES DOS MODAIS DA ESTAÇÃO ---
 
 // Abre o modal ao clicar na engrenagem
-async function openWeatherAlarmModal(key, unit) {
-    const meta = weatherMeta[key];
-    if (!meta) return;
-
-    currentAlarmKey = key; 
-
-    // Atualiza título do Modal
-    const elTitle = document.getElementById('weatherAlarmTitle');
-    if (elTitle) elTitle.innerText = `Configurar: ${meta.label}`;
-
-    // Limpa campos
-    document.getElementById('weatherAlarmMin').value = '';
-    document.getElementById('weatherAlarmMax').value = '';
-
-    // Busca limites salvos
-    try {
-        const resp = await fetch(`/api/config/limites/${key}`);
-        const data = await resp.json();
-        if (data.ok) {
-            if (data.min !== null) document.getElementById('weatherAlarmMin').value = data.min;
-            if (data.max !== null) document.getElementById('weatherAlarmMax').value = data.max;
-        }
-    } catch (e) {
-        console.error("Erro ao buscar limites", e);
+function openWeatherAlarmModal(key, unit) {
+    // Verifica permissão
+    if (currentProfile !== 'Administrador') {
+        return alert("Acesso Negado: Apenas Administradores podem configurar alarmes.");
     }
 
-    // Mostra o Modal (Centralizado pelo CSS novo)
+    // Define qual variável estamos editando
+    currentAlarmKey = key;
+    const meta = weatherMeta[key];
+    
+    // Atualiza título
+    const elTitle = document.getElementById('weatherAlarmTitle');
+    if (elTitle) elTitle.innerText = `Configurar: ${meta ? meta.label : key}`;
+
+    // --- AQUI ESTÁ A CORREÇÃO SIMPLES ---
+    // Lê direto da variável global (ex: ghi1_min, ghi1_max)
+    const valMin = limitesEstacao[`${key}_min`];
+    const valMax = limitesEstacao[`${key}_max`];
+
+    // Preenche os inputs (se o valor não existir, deixa em branco)
+    const inpMin = document.getElementById('weatherAlarmMin');
+    const inpMax = document.getElementById('weatherAlarmMax');
+    
+    if (inpMin) inpMin.value = (valMin !== undefined) ? valMin : '';
+    if (inpMax) inpMax.value = (valMax !== undefined) ? valMax : '';
+    // -------------------------------------
+
+    // Abre o modal
     const modal = document.getElementById('weatherAlarmModal');
     if (modal) modal.style.display = 'flex';
 }
@@ -1948,101 +2024,86 @@ async function saveWeatherAlarmThresholds() {
 
 // Função do Botão "Gravar" (Tela Sistema)
 async function salvarConfiguracoesGerais() {
+    // 1. Captura Tempos
     const tEstacao = document.getElementById('tempo_gravacao_estacao').value;
     const tTerm = document.getElementById('tempo_gravacao_termostatos').value;
     
-    // Payload compatível com a rota existente
+    // 2. Captura Dashboard (Slots)
+    const s1 = document.getElementById('cfg_dash_slot1').value;
+    const s2 = document.getElementById('cfg_dash_slot2').value;
+    const s3 = document.getElementById('cfg_dash_slot3').value;
+    const s4 = document.getElementById('cfg_dash_slot4').value;
+
+    // 3. Captura IPs e Portas (SISTEMA)
+    // Função auxiliar para pegar valor ou vazio se não existir
+    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+    const sistemaData = {
+        'ip_estacao_meteo': getVal('ip_estacao'),
+        'port_estacao_meteo': getVal('porta_estacao'),
+        'ip_termostatos': getVal('ip_termostatos'),
+        'port_termostatos': getVal('porta_termostatos'),
+        'ip_roteador': getVal('ip_roteador'),
+        'port_roteador': getVal('porta_roteador'),
+        'ip_cam1': getVal('ip_camera1'),
+        'port_cam1': getVal('porta_camera1'),
+        'ip_cam2': getVal('ip_camera2'),
+        'port_cam2': getVal('porta_camera2'),
+        'ip_ventilador': getVal('ip_ventilador'),
+        'port_ventilador': getVal('porta_ventilador')
+    };
+
+    // Monta o pacote completo
     const payload = {
         'TEMPOS': {
             'intervalo_gravacao_estacao_segundos': tEstacao,
             'intervalo_gravacao_termostatos_minutos': tTerm
         },
+        'DASHBOARD_DISPLAY': { 
+            'slot1': s1,
+            'slot2': s2,
+            'slot3': s3,
+            'slot4': s4
+        },
+        'SISTEMA': sistemaData, // Adicionamos a seção nova
         'usuario': currentUser
     };
 
+    // Envia
     const res = await API.salvarConfig(payload);
-    if (res.ok) alert("Configurações salvas!");
-    else alert("Erro: " + res.erro);
+    if (res.ok) {
+        alert("Configurações (IPs, Tempos e Dashboard) salvas!");
+        carregarConfiguracoes(); // Recarrega para confirmar
+    } else {
+        alert("Erro: " + res.erro);
+    }
 }
 
-// Garante que o botão da tela Sistema chame a função correta
+// ================= START (INICIALIZAÇÃO ÚNICA) =================
 document.addEventListener('DOMContentLoaded', () => {
-    const btnGravarSistema = document.querySelector('#system .btn-primary');
-    if(btnGravarSistema) {
-        btnGravarSistema.onclick = salvarConfiguracoesGerais;
-    }
-});
-
-// Função para salvar a configuração dos slots do Dashboard
-function salvarConfigDashboard() {
-    const slot1 = document.getElementById('dash_slot_1').value;
-    const slot2 = document.getElementById('dash_slot_2').value;
-    const slot3 = document.getElementById('dash_slot_3').value;
-    const slot4 = document.getElementById('dash_slot_4').value;
-
-    // Atualiza a variável global imediatamente
-    dashboardSlots = {
-        slot1: slot1,
-        slot2: slot2,
-        slot3: slot3,
-        slot4: slot4
-    };
-
-    // Salva no LocalStorage para persistir entre recargas (ou envie para o backend se preferir)
-    localStorage.setItem('dashboard_slots', JSON.stringify(dashboardSlots));
-    
-    // Atualiza o dashboard visualmente se ele estiver aberto
-    atualizarDados();
-    
-    console.log("Dashboard atualizado:", dashboardSlots);
-}
-
-// Carrega a configuração salva ao iniciar (adicione isso no final do arquivo também)
-document.addEventListener('DOMContentLoaded', () => {
-    const salvos = localStorage.getItem('dashboard_slots');
-    if (salvos) {
-        try {
-            const parsed = JSON.parse(salvos);
-            dashboardSlots = parsed;
-            // Atualiza os selects na tela Sistema se existirem
-            const s1 = document.getElementById('dash_slot_1');
-            if(s1) s1.value = parsed.slot1;
-            const s2 = document.getElementById('dash_slot_2');
-            if(s2) s2.value = parsed.slot2;
-            const s3 = document.getElementById('dash_slot_3');
-            if(s3) s3.value = parsed.slot3;
-            const s4 = document.getElementById('dash_slot_4');
-            if(s4) s4.value = parsed.slot4;
-        } catch (e) {
-            console.error("Erro ao carregar slots salvos", e);
-        }
-    }
-});
-
-// ================= START =================
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Inicia relógios e configurações
+    // 1. Inicia relógios e recupera sessão
     updateDateTime();
+    verificarSessao();
+    
+    // 2. Carrega configurações do servidor
     carregarConfiguracoes();
     
-    // 2. Inicia visualizações
+    // 3. Inicia visualizações
     generateHeatmap();
     gerarGridHeliostatos(); 
-	carregarDadosReplay();
+    carregarDadosReplay();
     
-    // 3. Busca dados iniciais
+    // 4. Busca dados iniciais
     atualizarDados();
     atualizarStatusConexao();
     carregarListaBases();
-    
-    // Carregar a tabela de usuários ao iniciar
     atualizarTabelaUsuarios(); 
 
-    // 4. Configura Relatórios
+    // 5. Configura Relatórios
     initReportDates();
     toggleReportOptions(); 
     
-    // 5. Define os loops de atualização (Timers)
+    // 6. Define os loops de atualização
     setInterval(updateDateTime, 1000);
     setInterval(generateHeatmap, 5000); 
     setInterval(atualizarDados, 2000);  
@@ -2050,6 +2111,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(gerarGridHeliostatos, 2000);
     setInterval(atualizarStatusCamerasUI, 2000);
 
-    // 6. Inicia Ventilador
+    // 7. Inicia Ventilador
     initVentiladorEvents();
+    
+    // 8. Garante que o botão Gravar (Sistema) use a função correta
+    const btnGravarSistema = document.querySelector('#system .btn-primary');
+    if(btnGravarSistema) {
+        // Remove qualquer onclick antigo do HTML e força o novo
+        btnGravarSistema.onclick = null; 
+        btnGravarSistema.addEventListener('click', salvarIPs);
+    }
 });
