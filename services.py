@@ -21,6 +21,8 @@ from weasyprint import HTML
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'heliot.config')
 
+ultimo_erro_interno = "Nenhum erro ainda"
+
 status_cameras = {1: False, 2: False}
 ultimo_alarme_registrado = {}
 
@@ -87,6 +89,10 @@ def ler_dados_estacao():
                 # Decodifica os bytes brutos para Float 32-bit
                 decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Big)
                 
+                print(f"--- DEBUG REGISTRADORES ---")
+                print(f"RAW: {rr.registers}") 
+                # ------------------------------------
+
                 dados = {
                     'v_bat': round(decoder.decode_32bit_float(), 2),       # 40001-40002
                     'ghi1': round(decoder.decode_32bit_float(), 2),        # 40003-40004
@@ -102,6 +108,7 @@ def ler_dados_estacao():
                     'chuva_acum': round(decoder.decode_32bit_float(), 2),  # 40023-40024
                     'ghi2': round(decoder.decode_32bit_float(), 2)         # 40025-40026
                 }
+                dados['debug_raw'] = rr.registers
                 checar_limites_estacao(dados, config)
             else:
                 print(f"[ERRO MODBUS] Falha leitura Estação: {rr}")
@@ -109,8 +116,9 @@ def ler_dados_estacao():
             client.close()
             return dados
         except Exception as e:
-            print(f"[ERRO CRITICO] Exceção na leitura Modbus: {e}")
-            client.close()
+            global ultimo_erro_interno
+            ultimo_erro_interno = str(e)  # <--- Salva o erro real aqui
+            print(f"Erro leitura: {e}")
             return None
     else:
         print(f"[ERRO CONEXAO] Não foi possível conectar em {ip}:{porta}")
@@ -345,14 +353,21 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
             writer.writerow([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), r.categoria, r.mensagem])
 
     elif tipo == 'weather':
-        writer.writerow(['Data/Hora', 'DNI (W/m2)', 'GHI (W/m2)', 'Vento Dir.', 'Vento Vel. (m/s)', 'Precipitacao (mm)', 'Taxa Chuva (mm/h)'])
+        # Novas colunas (14 campos)
+        writer.writerow([
+            'Data/Hora', 'Bateria (V)', 'GHI 1 (W/m2)', 'DHI (W/m2)', 'BNI (W/m2)', 
+            'OLD (W/m2)', 'LWD (W/m2)', 'Vento Vel. (m/s)', 'Vento Dir. (°)', 
+            'Temp. Ar (°C)', 'Umidade Rel. (%)', 'Pressão Atm. (mbar)', 'Chuva Acum. (mm)', 'GHI 2 (W/m2)'
+        ])
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
             def fmt(val): return str(val).replace('.', ',') if val is not None else ''
             writer.writerow([
                 r.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
-                fmt(r.dni), fmt(r.ghi), fmt(r.vento_direcao), fmt(r.vento_velocidade),
-                fmt(r.precipitacao), fmt(r.taxa_chuva)
+                fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
+                fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
+                fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
+                fmt(r.chuva_acum), fmt(r.ghi2)
             ])
 
     elif tipo == 'sensors':
@@ -391,12 +406,17 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
 
     elif tipo == 'weather':
         titulo = "Histórico da Estação Meteorológica"
-        colunas = ['Data/Hora', 'DNI', 'GHI', 'Dir. Vento', 'Vel. Vento', 'Chuva (mm)', 'Taxa (mm/h)']
+        # Nomes mais curtos para caber no PDF
+        colunas = ['Data/Hora', 'Bat.', 'GHI1', 'DHI', 'BNI', 'OLD', 'LWD', 'Vel.Vento', 'Dir.Vento', 'Temp.', 'Umid.', 'Pressão', 'Chuva', 'GHI2']
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
+            def fmt(val): return str(val) if val is not None else '--'
             linhas.append([
                 r.data_hora.strftime("%d/%m/%Y %H:%M"),
-                str(r.dni), str(r.ghi), str(r.vento_direcao), str(r.vento_velocidade), str(r.precipitacao), str(r.taxa_chuva)
+                fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
+                fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
+                fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
+                fmt(r.chuva_acum), fmt(r.ghi2)
             ])
 
     # Renderiza HTML
@@ -410,7 +430,9 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
                                   linhas=linhas)
     
     # Gera PDF
-    return HTML(string=html_string).write_pdf()
+    pdf_io = io.BytesIO()
+    HTML(string=html_string).write_pdf(target=pdf_io)
+    return pdf_io.getvalue()
 
 # Funções: ventilador (WEG CFW500)
 
@@ -662,3 +684,5 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
         return {"ok": True}
     else:
         return {"ok": False, "msg": msg_erro or "Erro desconhecido"}
+
+        
