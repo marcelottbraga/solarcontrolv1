@@ -2,18 +2,18 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Relatório Heliot</title>
+    <title>Relatório Solar COntrol</title>
     <style>
         @page {
-            size: A4;
-            margin: 2cm;
+            size: A4 landscape; 
+            margin: 1.5cm;
             @bottom-right {
                 content: "Página " counter(page) " de " counter(pages);
                 font-family: Arial, sans-serif;
-                font-size: 9pt;
+                font-size: 8pt;
             }
         }
-        body { font-family: 'Arial', sans-serif; font-size: 10pt; color: #333; }
+        body { font-family: 'Arial', sans-serif; font-size: 9pt; color: #333; }
         
         /* Cabeçalho */
         .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #00d084; padding-bottom: 10px; }
@@ -23,8 +23,10 @@
 
         /* Tabela */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #f0f0f0; border-bottom: 2px solid #ccc; font-weight: bold; padding: 8px; text-align: left; font-size: 9pt; }
-        td { padding: 8px; border-bottom: 1px solid #eee; font-size: 9pt; vertical-align: top; }
+        
+        /* MUDANÇA: Redução da fonte da tabela para 8pt e do padding para 5px */
+        th { background-color: #f0f0f0; border-bottom: 2px solid #ccc; font-weight: bold; padding: 5px; text-align: left; font-size: 8pt; }
+        td { padding: 5px; border-bottom: 1px solid #eee; font-size: 8pt; vertical-align: top; }
         
         /* Zebrado (Linhas pares/impares) */
         tr:nth-child(even) { background-color: #fafafa; }
