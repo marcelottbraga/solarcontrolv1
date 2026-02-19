@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, Response, current_app, session
 from extensions import db
-from models import Usuario, HelioBase, LogAlarme, LogEvento, HistoricoTermopares, Historico
+from models import Usuario, HeliostatoCadastro, HeliostatoOperacao, LogAlarme, LogEvento, HistoricoTermopares, Historico
 import services
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
@@ -243,86 +243,88 @@ def api_alarmes_recentes():
     return jsonify([a.to_dict() for a in alarmes])
 
 # API: bases heliotérmicas
-@bp.route("/api/bases", methods=["GET"])
-def api_get_bases():
-    bases = HelioBase.query.order_by(HelioBase.id).all()
-    return jsonify([b.to_dict() for b in bases])
-
-# --- ROTAS DE GERENCIAMENTO DE BASES (HELIOSTATOS) ---
+# --- ROTAS DE GERENCIAMENTO DE HELIOSTATOS ---
 
 @bp.route('/api/bases', methods=['GET'])
 def listar_bases():
-    bases = HelioBase.query.order_by(HelioBase.nome).all()
-    return jsonify([b.to_dict() for b in bases])
+    bases = HeliostatoCadastro.query.order_by(HeliostatoCadastro.numero).all()
+    # Retorna o dicionário construído manualmente com as novas colunas
+    return jsonify([{
+        "numero": b.numero,
+        "ip": b.ip,
+        "porta": b.porta,
+        "posicao": b.posicao,
+        "theta": b.theta,
+        "phi": b.phi,
+        "taxa_atualizacao": b.taxa_atualizacao
+    } for b in bases])
 
-@bp.route('/api/bases/<int:id>', methods=['GET'])
-def obter_base(id):
-    base = HelioBase.query.get_or_404(id)
-    return jsonify(base.to_dict())
+@bp.route('/api/bases/<int:numero>', methods=['GET'])
+def obter_base(numero):
+    b = HeliostatoCadastro.query.get_or_404(numero)
+    return jsonify({
+        "numero": b.numero, "ip": b.ip, "porta": b.porta, 
+        "posicao": b.posicao, "theta": b.theta, "phi": b.phi, 
+        "taxa_atualizacao": b.taxa_atualizacao
+    })
 
 @bp.route('/api/bases', methods=['POST'])
 def criar_base():
     data = request.get_json()
     user_nome = data.get('usuario_solicitante')
     
-    # --- VERIFICAÇÃO ADMIN ---
     solicitante = Usuario.query.filter_by(usuario=user_nome).first()
     if not solicitante or solicitante.perfil != 'Administrador':
         return jsonify({"ok": False, "erro": "Acesso Negado: Apenas Administradores podem criar heliostatos."})
-    # -------------------------
 
     try:
-        nova_base = HelioBase(
-            nome=data.get('nome'),
+        nova_base = HeliostatoCadastro(
+            numero=int(data.get('numero')),
             ip=data.get('ip'),
             porta=int(data.get('porta', 502)),
-            alpha=data.get('alpha'),
-            beta=data.get('beta'),
-            theta=data.get('theta')
+            posicao=int(data.get('posicao')) if data.get('posicao') else None,
+            theta=float(data.get('theta', 0.0)),
+            phi=float(data.get('phi', 0.0)),
+            taxa_atualizacao=int(data.get('taxa_atualizacao', 5))
         )
         db.session.add(nova_base)
         db.session.commit()
-        return jsonify({"ok": True, "id": nova_base.id})
+        return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "erro": str(e)})
 
-@bp.route('/api/bases/<int:id>', methods=['PUT'])
-def atualizar_base(id):
+@bp.route('/api/bases/<int:numero>', methods=['PUT'])
+def atualizar_base(numero):
     data = request.get_json()
     user_nome = data.get('usuario_solicitante')
 
-    # --- VERIFICAÇÃO ADMIN ---
     solicitante = Usuario.query.filter_by(usuario=user_nome).first()
     if not solicitante or solicitante.perfil != 'Administrador':
-        return jsonify({"ok": False, "erro": "Acesso Negado: Apenas Administradores podem editar heliostatos."})
-    # -------------------------
+        return jsonify({"ok": False, "erro": "Acesso Negado."})
 
-    base = HelioBase.query.get_or_404(id)
+    base = HeliostatoCadastro.query.get_or_404(numero)
     try:
-        base.nome = data.get('nome')
-        base.ip = data.get('ip')
-        base.porta = int(data.get('porta', 502))
-        base.alpha = data.get('alpha')
-        base.beta = data.get('beta')
-        base.theta = data.get('theta')
+        base.ip = data.get('ip', base.ip)
+        base.porta = int(data.get('porta', base.porta))
+        base.posicao = int(data.get('posicao')) if data.get('posicao') else base.posicao
+        base.theta = float(data.get('theta', base.theta))
+        base.phi = float(data.get('phi', base.phi))
+        base.taxa_atualizacao = int(data.get('taxa_atualizacao', base.taxa_atualizacao))
         
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "erro": str(e)})
 
-@bp.route('/api/bases/<int:id>', methods=['DELETE'])
-def deletar_base(id):
-    # Usuário vem via Query String no DELETE
+@bp.route('/api/bases/<int:numero>', methods=['DELETE'])
+def deletar_base(numero):
     user_nome = request.args.get('usuario_solicitante')
     
-    # --- VERIFICAÇÃO ADMIN ---
     solicitante = Usuario.query.filter_by(usuario=user_nome).first()
     if not solicitante or solicitante.perfil != 'Administrador':
-        return jsonify({"ok": False, "erro": "Acesso Negado: Apenas Administradores podem excluir heliostatos."})
-    # -------------------------
+        return jsonify({"ok": False, "erro": "Acesso Negado."})
 
-    base = HelioBase.query.get_or_404(id)
+    base = HeliostatoCadastro.query.get_or_404(numero)
     try:
         db.session.delete(base)
         db.session.commit()
@@ -547,31 +549,24 @@ def api_post_ventilador():
 @bp.route('/api/heliostatos/status_geral', methods=['GET'])
 def api_status_heliostatos():
     """Retorna status resumido COM LEITURA REAL para pintar o grid corretamente"""
-    bases = HelioBase.query.all()
+    bases = HeliostatoCadastro.query.all()
     lista = {}
     
     for b in bases:
         try:
-            # Extrai o ID do nome (ex: "Base 1" -> 1)
-            num_str = ''.join(filter(str.isdigit, b.nome))
-            if num_str:
-                num = int(num_str)
-                
-                # --- A MÁGICA ACONTECE AQUI ---
-                # Chamamos a função que vai lá no ESP32/Simulador e pergunta: "E aí?"
-                # Isso preenche 'online', 'status_code' (0 ou 1) e 'status'
-                dados_reais = services.ler_dados_heliostato(num)
-                
-                lista[num] = {
-                    "configurado": True,
-                    "ip": b.ip,
-                    # Agora estamos enviando os dados que faltavam!
-                    "online": dados_reais['online'],         
-                    "status_code": dados_reais['status_code'], 
-                    "status": dados_reais['status']          
-                }
+            num = b.numero
+            dados_reais = services.ler_dados_heliostato(num)
+            
+            lista[num] = {
+                "configurado": True,
+                "ip": b.ip,
+                "posicao": b.posicao,
+                "online": dados_reais['online'],         
+                "status_code": dados_reais['status_code'], 
+                "status": dados_reais['status']          
+            }
         except Exception as e:
-            print(f"Erro ao processar base {b.nome}: {e}")
+            print(f"Erro ao processar base {b.numero}: {e}")
             pass
             
     return jsonify(lista)

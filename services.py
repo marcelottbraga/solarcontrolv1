@@ -14,7 +14,7 @@ from pymodbus.client import ModbusTcpClient
 from sqlalchemy import or_
 
 from extensions import db
-from models import Historico, HistoricoTermopares, LogAlarme, LogEvento, HelioBase
+from models import Historico, HistoricoTermopares, LogAlarme, LogEvento, HeliostatoCadastro, HeliostatoOperacao
 from flask import render_template
 from weasyprint import HTML
 
@@ -570,12 +570,7 @@ def ler_dados_heliostato(heliostato_id):
     """
     Lê todos os dados vitais do heliostato via Modbus
     """
-    # 1. Busca IP no Banco
-    base = HelioBase.query.filter_by(nome=str(heliostato_id)).first() # Assumindo que 'nome' guarda o numero ou ID
-    # Se no banco o nome for "Base 01", precisaremos ajustar a lógica de busca. 
-    # Vou assumir busca pelo ID ou adaptar se você usar o campo 'nome' como identificador numérico.
-    
-    # Fallback para teste se não achar no banco (apenas para não quebrar o dev)
+    base = HeliostatoCadastro.query.filter_by(numero=int(heliostato_id)).first()
     ip = base.ip if base else '127.0.0.1' 
     porta = base.porta if base else 502
 
@@ -593,32 +588,16 @@ def ler_dados_heliostato(heliostato_id):
 
     if client.connect():
         try:
-            # Lê registradores 0 a 12 (13 registros)
             rr = client.read_holding_registers(address=0, count=13)
             
             if not rr.isError():
                 regs = rr.registers
                 dados["online"] = True
-                
-                # Decodifica Alpha (Reg 0 e 1)
                 dados["alpha"] = decodificar_angulo_custom(regs[0], regs[1])
-                
-                # Decodifica Beta (Reg 2 e 3)
                 dados["beta"] = decodificar_angulo_custom(regs[2], regs[3])
-                
-                # Vetores (Reg 4, 5, 6) - Apenas informativo se quiser usar depois
-                # bx = regs[4] / 1000.0
-                
-                # Modo (Reg 10)
                 dados["modo"] = "Automático" if regs[10] == 1 else "Manual"
-                
-                # Status (Reg 11)
                 dados["status_code"] = regs[11]
                 dados["status"] = "Movendo" if regs[11] == 1 else "Ocioso"
-                
-                # Theta (Reg 12) - Tratando como float simples ou escalado
-                # Se for float IEEE 754 precisaria ler 2 regs, mas o firmware parece usar int escalado.
-                # Vou assumir escala 1000 igual aos vetores por segurança, ou direto.
                 dados["theta"] = regs[12] / 1000.0 if regs[12] > 360 else regs[12]
 
         except Exception as e:
@@ -630,10 +609,9 @@ def ler_dados_heliostato(heliostato_id):
 
 def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
     """
-    Envia comandos. 
-    tipo_comando: 'manual' (requer valores={'alpha': x, 'beta': y}) ou 'modo' (valores={'modo': 0/1})
+    Envia comandos manuais ou de modo.
     """
-    base = HelioBase.query.filter_by(nome=str(heliostato_id)).first()
+    base = HeliostatoCadastro.query.filter_by(numero=int(heliostato_id)).first()
     ip = base.ip if base else '127.0.0.1'
     porta = base.porta if base else 502
 
@@ -644,23 +622,17 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
     if client.connect():
         try:
             if tipo_comando == 'modo':
-                # REGRA: Troca de modo (Auto/Manual) é SEMPRE permitida.
-                # É assim que abortamos um movimento ou iniciamos o rastreio.
                 novo_modo = int(valores.get('modo', 0))
                 client.write_register(address=10, value=novo_modo)
                 sucesso = True
                 
             elif tipo_comando == 'manual':
-                # REGRA: Para enviar NOVAS COORDENADAS, verificamos se já está movendo.
-                # Se estiver movendo (Reg 11=1), BLOQUEAMOS a escrita para "esperar o parâmetro chegar".
                 rr_status = client.read_holding_registers(address=11, count=1)
-                
                 if not rr_status.isError() and rr_status.registers[0] == 1:
                     client.close()
                     return {"ok": False, "msg": "Heliostato em movimento. Aguarde chegar na posição."}
 
-                # Se estiver parado, envia o novo alvo:
-                client.write_register(address=10, value=0) # Garante modo manual
+                client.write_register(address=10, value=0) 
                 
                 alpha = float(valores.get('alpha', 0))
                 beta = float(valores.get('beta', 0))
@@ -668,15 +640,10 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
                 msb_a, lsb_a = codificar_angulo_custom(alpha)
                 msb_b, lsb_b = codificar_angulo_custom(beta)
                 
-                # Escreve Alpha e Beta nos registradores de alvo
                 client.write_registers(address=0, values=[msb_a, lsb_a, msb_b, lsb_b])
                 sucesso = True
 
             elif tipo_comando == 'salvar_vetor':
-                # TODO: COMANDO PROVISÓRIO PARA SALVAR VETOR RECEPTOR
-                # Mudar o endereço (address) e o valor (value) de acordo com o 
-                # mapa Modbus oficial do firmware do ESP32 quando estiver pronto.
-                # Aqui, usamos temporariamente a escrita do valor "1" no registrador "15".
                 client.write_register(address=15, value=1)
                 sucesso = True
 
@@ -693,4 +660,53 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
     else:
         return {"ok": False, "msg": msg_erro or "Erro desconhecido"}
 
+def loop_gravacao_heliostatos(app):
+    """
+    Loop em background que lê a 'taxa_atualizacao' (em ms) do banco 
+    e grava o histórico de operação continuamente.
+    """
+    ultimas_gravacoes = {}
+    
+    while True:
+        with app.app_context():
+            try:
+                bases = HeliostatoCadastro.query.all()
+                agora = time.time()
+                
+                for b in bases:
+                    num = b.numero
+                    taxa_ms = b.taxa_atualizacao if b.taxa_atualizacao else 5000
+                    
+                    # Converte ms para segundos. Mínimo de 0.5s para não engasgar a CPU do servidor.
+                    taxa_segundos = max(0.5, taxa_ms / 1000.0) 
+                    
+                    ultimo_tempo = ultimas_gravacoes.get(num, 0)
+                    
+                    # Chegou a hora de gravar para este heliostato específico?
+                    if (agora - ultimo_tempo) >= taxa_segundos:
+                        dados = ler_dados_heliostato(num)
+                        
+                        # Só grava no histórico se a comunicação Modbus funcionou (online = True)
+                        if dados and dados.get('online'):
+                            nova_operacao = HeliostatoOperacao(
+                                numero=num,
+                                status=dados.get('status', 'Desconhecido'),
+                                alpha=dados.get('alpha', 0.0),
+                                beta=dados.get('beta', 0.0),
+                                theta=b.theta,
+                                phi=b.phi,
+                                data_hora=datetime.now()
+                            )
+                            db.session.add(nova_operacao)
+                            
+                        # Atualiza o relógio interno para este heliostato
+                        ultimas_gravacoes[num] = agora
+                
+                db.session.commit()
+            except Exception as e:
+                print(f"Erro loop gravacao heliostatos: {e}")
+                db.session.rollback()
+                
+        # Pausa curta para não monopolizar o processador
+        time.sleep(0.5)
         

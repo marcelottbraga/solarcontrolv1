@@ -90,30 +90,29 @@ class LogAlarme(db.Model):
         }
         
 # Modelo: Bases heliotérmicas
-class HelioBase(db.Model):
-    __tablename__ = 'helio_bases'
+class HeliostatoCadastro(db.Model):
+    __tablename__ = 'heliostato_cadastro'
+    
+    numero = db.Column(db.Integer, primary_key=True)
+    data_cadastro = db.Column(db.DateTime, default=datetime.utcnow)
+    ip = db.Column(db.String(50))
+    porta = db.Column(db.Integer, default=502)
+    posicao = db.Column(db.Integer)
+    theta = db.Column(db.Float, default=0.0)
+    phi = db.Column(db.Float, default=0.0)
+    taxa_atualizacao = db.Column(db.Integer, default=5)
+
+class HeliostatoOperacao(db.Model):
+    __tablename__ = 'heliostato_operacao'
     
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(50), nullable=False)
-    ip = db.Column(db.String(20))
-    porta = db.Column(db.Integer)
-    
-
-    alpha = db.Column(db.String(50)) 
-    beta = db.Column(db.String(50))
-    theta = db.Column(db.String(50))
-
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "nome": self.nome,
-            "ip": self.ip,
-            "porta": self.porta,
-            "alpha": self.alpha,
-            "beta": self.beta,
-            "theta": self.theta
-        }
+    numero = db.Column(db.Integer, nullable=False)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(50)) 
+    alpha = db.Column(db.Float, default=0.0)
+    beta = db.Column(db.Float, default=0.0)
+    theta = db.Column(db.Float, default=0.0)
+    phi = db.Column(db.Float, default=0.0)
         
 # Modelo: Log de eventos
 class LogEvento(db.Model):
