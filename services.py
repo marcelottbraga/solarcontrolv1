@@ -671,7 +671,15 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
                 # Escreve Alpha e Beta nos registradores de alvo
                 client.write_registers(address=0, values=[msb_a, lsb_a, msb_b, lsb_b])
                 sucesso = True
-                
+
+            elif tipo_comando == 'salvar_vetor':
+                # TODO: COMANDO PROVISÓRIO PARA SALVAR VETOR RECEPTOR
+                # Mudar o endereço (address) e o valor (value) de acordo com o 
+                # mapa Modbus oficial do firmware do ESP32 quando estiver pronto.
+                # Aqui, usamos temporariamente a escrita do valor "1" no registrador "15".
+                client.write_register(address=15, value=1)
+                sucesso = True
+
         except Exception as e:
             print(f"Erro escrita Heliostato: {e}")
             msg_erro = str(e)
