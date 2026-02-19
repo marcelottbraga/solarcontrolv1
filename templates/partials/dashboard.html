@@ -123,8 +123,7 @@
                 </div>
             </div>
 
-            <div class="modal-info-grid">
-                <div class="modal-info-card">
+            <div class="modal-info-grid" style="grid-template-columns: 1fr 1fr;"> <div class="modal-info-card">
                     <div class="modal-info-label">Alpha (α)</div>
                     <div class="modal-info-value" id="valAlpha">0.0°</div>
                 </div>
@@ -132,11 +131,7 @@
                     <div class="modal-info-label">Beta (β)</div>
                     <div class="modal-info-value" id="valBeta">0.0°</div>
                 </div>
-                <div class="modal-info-card">
-                    <div class="modal-info-label">Theta (θ)</div>
-                    <div class="modal-info-value" id="valTheta">0.0°</div>
                 </div>
-            </div>
 
             <div style="margin-top: 5px;">
                 <div class="form-label" style="margin-bottom: 8px;">Comando Manual</div>
@@ -150,6 +145,11 @@
                     MOVER PARA POSIÇÃO
                 </button>
                 
+                <button id="btnSalvarVetor" class="btn-primary" onclick="enviarComandoHelio('salvar_vetor')" style="width: 100%; margin-bottom: 15px;">
+                    SALVAR VETOR RECEPTOR
+                </button>
+                
+               
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-secondary" onclick="enviarComandoHelio('auto')" style="flex: 1; border: 1px solid var(--color-success); color: var(--color-success);">
                         RASTREAR
