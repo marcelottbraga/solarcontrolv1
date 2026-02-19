@@ -1047,13 +1047,10 @@ async function gerarGridHeliostatos() {
     const grid = document.getElementById('heliostatosGrid');
     if (!grid) return;
     
-    // Se primeira vez, define layout
     if (grid.children.length === 0) {
         grid.style.display = 'flex';
         grid.style.flexDirection = 'column';
         grid.style.alignItems = 'center'; 
-        // Reduzi o gap minimamente (de 5px para 4px) apenas para garantir que 
-        // a 8ª linha caiba perfeitamente sem alterar o tamanho do card pai.
         grid.style.gap = '4px'; 
     }
 
@@ -1066,12 +1063,10 @@ async function gerarGridHeliostatos() {
         return; 
     }
 
-    // Limpa HTML para garantir que não haja lixo visual
     grid.innerHTML = ''; 
 
-    // --- MUDANÇA DO NOVO LAYOUT (8 linhas) ---
     const layoutLinhas = [3, 5, 7, 10, 10, 7, 5, 3]; 
-    let contadorHeliostato = 1;
+    let contadorPosicao = 1; // <--- Agora isso conta o buraco no chão (Posição 1 a 50)
 
     layoutLinhas.forEach(qtdNaLinha => {
         const rowDiv = document.createElement('div');
@@ -1080,47 +1075,51 @@ async function gerarGridHeliostatos() {
         rowDiv.style.justifyContent = 'center';
 
         for (let i = 0; i < qtdNaLinha; i++) {
-            if (contadorHeliostato > 50) break; 
-            const idAtual = contadorHeliostato; // Congela ID
+            if (contadorPosicao > 50) break; 
+            const posicaoAtual = contadorPosicao; 
 
             const cell = document.createElement('div');
             cell.className = 'heliostato-cell'; 
             cell.style.backgroundColor = ''; 
 
-            const dadosHelio = configurados[idAtual];
+            // --- MAGICA: Procura qual heliostato está nesta POSIÇÃO ---
+            let helioNumero = null;
+            let dadosHelio = null;
+
+            for (const [numeroStr, dados] of Object.entries(configurados)) {
+                if (dados.posicao === posicaoAtual) {
+                    helioNumero = parseInt(numeroStr);
+                    dadosHelio = dados;
+                    break;
+                }
+            }
 
             if (!dadosHelio) {
-                // --- NÃO EXISTE (Deixa sem número) ---
-                cell.textContent = ""; // <--- MUDANÇA: Quadrado em branco
+                // --- POSIÇÃO VAZIA ---
+                cell.textContent = ""; 
                 cell.classList.add('status-gray');
-                cell.title = "Não Configurado";
+                cell.title = `Posição ${posicaoAtual} - Vazia`;
                 cell.style.cursor = 'not-allowed';
             } else {
-                // --- EXISTE (Coloca o número) ---
-                cell.textContent = idAtual; // <--- MUDANÇA: Número real
+                // --- HELIOSTATO ENCONTRADO NESTA POSIÇÃO ---
+                cell.textContent = helioNumero; // Mostra o NÚMERO real (Ex: 257)
                 cell.style.cursor = 'pointer';
-                cell.onclick = () => abrirModalHeliostato(idAtual);
+                cell.onclick = () => abrirModalHeliostato(helioNumero); // Clica usando o número real
 
-                // LÓGICA DE COR MANTIDA INTACTA:
                 let isOnline = (String(dadosHelio.online).toLowerCase() === 'true' || dadosHelio.online == 1);
-                
-                if (dadosHelio.status_code === 1) {
-                    isOnline = true; // Override: Movendo é Online
-                }
+                if (dadosHelio.status_code === 1) isOnline = true;
 
                 if (!isOnline) {
-                    // Offline Real -> Vermelho
                     cell.classList.add('status-red');
-                    cell.title = `Offline`;
+                    cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - Offline`;
                 } else {
-                    // Online -> Azul
                     cell.classList.add('status-blue');
-                    if (dadosHelio.status_code === 1) cell.title = `Helio ${idAtual}: MOVENDO...`;
-                    else cell.title = `Helio ${idAtual}: Online`;
+                    if (dadosHelio.status_code === 1) cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - MOVENDO...`;
+                    else cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - Online`;
                 }
             }
             rowDiv.appendChild(cell);
-            contadorHeliostato++;
+            contadorPosicao++;
         }
         grid.appendChild(rowDiv);
     });
@@ -1313,119 +1312,267 @@ async function enviarComandoHelio(acao) {
         alert("Erro de comunicação");
     }
 }
-// BASES CRUD
+
+// =================  (GERENCIAMENTO DE HELIOSTATOS - CADASTROS) =================
 let listaBasesCache = [];
+
 async function carregarListaBases() {
-    const select = document.getElementById('baseSelect');
-    if (!select) return;
-    listaBasesCache = await API.getBases();
-    select.innerHTML = '<option value="">-- Novo Heliostato (Clique para criar) --</option>';
-    listaBasesCache.forEach(base => {
-        const opt = document.createElement('option');
-        opt.value = base.id; opt.textContent = base.nome; select.appendChild(opt);
+    const tbody = document.getElementById('tabelaHeliostatosBody');
+    if (!tbody) return;
+    
+    try {
+        // CORREÇÃO: Usamos fetch direto com timestamp (?t=) para driblar o cache do navegador!
+        const res = await fetch('/api/bases?t=' + new Date().getTime());
+        listaBasesCache = await res.json();
+        
+        tbody.innerHTML = '';
+        
+        if (listaBasesCache.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #aaa;">Nenhum heliostato cadastrado.</td></tr>';
+            return;
+        }
+        
+        // Pinta a tabela linha a linha
+        listaBasesCache.forEach(base => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #333';
+            
+            tr.innerHTML = `
+                <td style="padding: 12px; font-weight: bold; color: var(--color-primary);">${base.numero}</td>
+                <td style="padding: 12px;">${base.ip || '--'}</td>
+                <td style="padding: 12px;">${base.porta || 502}</td>
+                <td style="padding: 12px;">${base.posicao || '--'}</td>
+                <td style="padding: 12px;">${base.theta !== null ? base.theta : '--'}</td>
+                <td style="padding: 12px;">${base.phi !== null ? base.phi : '--'}</td>
+                <td style="padding: 12px;">${base.taxa_atualizacao || '--'}</td>
+                <td style="padding: 12px; text-align: center;">
+                    <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.8em;" title="Editar" onclick="abrirModalEditarHeliostato(${base.numero})">✏️</button>
+                    <button class="btn-danger" style="padding: 4px 10px; font-size: 0.8em; margin-left: 5px;" title="Excluir" onclick="apagarBase(${base.numero})">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Erro ao carregar bases:", e);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #ff4444;">Erro ao carregar a lista.</td></tr>';
+    }
+}
+
+async function apagarBase(numero) {
+    if (!numero) return;
+    
+    // Trava de Segurança
+    if (currentProfile !== 'Administrador') {
+        return alert("Acesso Negado: Apenas Administradores podem excluir heliostatos.");
+    }
+    
+    if (confirm(`Tem certeza que deseja excluir permanentemente o heliostato número ${numero}?`)) {
+        const res = await API.deletarBase(numero, currentUserLogin);
+        
+        if (res.ok) { 
+            alert("Heliostato excluído com sucesso."); 
+            carregarListaBases(); 
+            // Atualiza os pontinhos do Dashboard instantaneamente
+            if (typeof gerarGridHeliostatos === 'function') {
+                gerarGridHeliostatos(); 
+            }
+        } else {
+            alert("Erro ao excluir: " + (res.erro || "Desconhecido"));
+        }
+    }
+}
+
+// ================= MODAL NOVO / EDITAR HELIOSTATO =================
+
+function fecharModalCadastroHeliostato() {
+    document.getElementById('modalCadastroHeliostato').style.display = 'none';
+}
+
+function abrirModalNovoHeliostato() {
+    if (currentProfile !== 'Administrador') return alert("Acesso Negado: Apenas Administradores.");
+    
+    document.getElementById('modalCadastroTitulo').textContent = "Novo Heliostato";
+    
+    // Limpa os campos e libera o Número
+    document.getElementById('cadNumero').value = "";
+    document.getElementById('cadNumero').disabled = false; // Libera digitação
+    document.getElementById('cadTaxa').value = "5000";
+    document.getElementById('cadIP').value = "";
+    document.getElementById('cadPorta').value = "502";
+    document.getElementById('cadTheta').value = "0.0";
+    document.getElementById('cadPhi').value = "0.0";
+    document.getElementById('cadPosicao').value = "";
+    document.getElementById('displayPosicao').textContent = "Nenhuma";
+    document.getElementById('displayPosicao').style.color = "#aaa";
+    
+    // Renderiza grid liberando todas as posições (exceto as já cadastradas no BD)
+    gerarGridSelecaoPosicao(null);
+    document.getElementById('modalCadastroHeliostato').style.display = 'flex';
+}
+
+function abrirModalEditarHeliostato(numero) {
+    if (currentProfile !== 'Administrador') return alert("Acesso Negado: Apenas Administradores.");
+    
+    const base = listaBasesCache.find(b => b.numero === numero);
+    if (!base) return alert("Erro: Heliostato não encontrado no cache.");
+    
+    document.getElementById('modalCadastroTitulo').textContent = `Editar Heliostato ${numero}`;
+    
+    // Preenche campos e TRAVA o Número (Chave Primária não muda)
+    document.getElementById('cadNumero').value = base.numero;
+    document.getElementById('cadNumero').disabled = true; 
+    document.getElementById('cadTaxa').value = base.taxa_atualizacao || 5000;
+    document.getElementById('cadIP').value = base.ip || "";
+    document.getElementById('cadPorta').value = base.porta || 502;
+    document.getElementById('cadTheta').value = base.theta !== null ? base.theta : 0.0;
+    document.getElementById('cadPhi').value = base.phi !== null ? base.phi : 0.0;
+    
+    const pos = base.posicao || "";
+    document.getElementById('cadPosicao').value = pos;
+    document.getElementById('displayPosicao').textContent = pos || "Nenhuma";
+    document.getElementById('displayPosicao').style.color = pos ? "var(--color-primary)" : "#aaa";
+    
+    // Renderiza grid liberando as livres + a posição pertencente a ESTE próprio heliostato
+    gerarGridSelecaoPosicao(pos);
+    document.getElementById('modalCadastroHeliostato').style.display = 'flex';
+}
+
+// ================= MAPA DE SELEÇÃO VISUAL =================
+
+function gerarGridSelecaoPosicao(posicaoDoHelioAtual) {
+    const grid = document.getElementById('gridSelecaoPosicao');
+    grid.innerHTML = '';
+    
+    const layoutLinhas = [3, 5, 7, 10, 10, 7, 5, 3];
+    let contadorPosicao = 1;
+    
+    // Descobre quais buracos já têm dono (ignora a posição do dono atual se estiver editando)
+    let posicoesOcupadas = listaBasesCache
+        .map(b => b.posicao)
+        .filter(p => p !== null && p !== posicaoDoHelioAtual);
+
+    const posSelecionadaNoForm = parseInt(document.getElementById('cadPosicao').value) || null;
+
+    layoutLinhas.forEach(qtdNaLinha => {
+        const rowDiv = document.createElement('div');
+        rowDiv.style.display = 'flex';
+        rowDiv.style.gap = '4px';
+        rowDiv.style.justifyContent = 'center';
+
+        for (let i = 0; i < qtdNaLinha; i++) {
+            if (contadorPosicao > 50) break;
+            const pos = contadorPosicao;
+            
+            const cell = document.createElement('div');
+            // Reutiliza a classe do dashboard para manter mesmo tamanho e visual
+            cell.className = 'heliostato-cell'; 
+            cell.style.display = 'flex';
+            cell.style.alignItems = 'center';
+            cell.style.justifyContent = 'center';
+            cell.style.fontSize = '12px';
+            
+            if (posicoesOcupadas.includes(pos)) {
+                // BURADO OCUPADO: Fica cinza escuro e bloqueado
+                cell.classList.add('status-gray');
+                cell.style.cursor = 'not-allowed';
+                cell.style.opacity = '0.3';
+                cell.title = `Posição ${pos} - Já Ocupada`;
+                cell.textContent = "x";
+            } else {
+                // BURACO LIVRE (ou pertencente ao Helio sendo editado)
+                cell.style.cursor = 'pointer';
+                cell.textContent = pos;
+                
+                if (pos === posSelecionadaNoForm) {
+                    // Selecionada agora na tela
+                    cell.style.backgroundColor = 'var(--color-primary)';
+                    cell.style.color = '#000';
+                    cell.style.fontWeight = 'bold';
+                    cell.title = `Posição ${pos} (Selecionada)`;
+                } else {
+                    // Totalmente Livre
+                    cell.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                    cell.style.border = '1px dashed #555';
+                    cell.style.color = '#aaa';
+                    cell.title = `Clique para selecionar Posição ${pos}`;
+                }
+                
+                cell.onclick = () => selecionarPosicao(pos, posicaoDoHelioAtual);
+            }
+            
+            rowDiv.appendChild(cell);
+            contadorPosicao++;
+        }
+        grid.appendChild(rowDiv);
     });
 }
-// Função para preencher o formulário quando seleciona um item no Select
-async function carregarBaseSelecionada() {
-    const id = document.getElementById('baseSelect').value;
-    if (!id) {
-        resetFormBase();
-        return;
-    }
 
-    try {
-        const res = await fetch(`/api/bases/${id}`);
-        const base = await res.json();
-
-        document.getElementById('baseId').value = base.id;
-        document.getElementById('baseNome').value = base.nome; // Agora é o número (1-50)
-        document.getElementById('baseIp').value = base.ip;
-        document.getElementById('basePort').value = base.porta;
-        
-        // NOVOS CAMPOS
-        document.getElementById('baseAlpha').value = base.alpha || 0;
-        document.getElementById('baseBeta').value = base.beta || 0;
-        document.getElementById('baseTheta').value = base.theta || 0;
-
-    } catch (e) {
-        console.error("Erro ao carregar base:", e);
-    }
+function selecionarPosicao(pos, posicaoDoHelioAtual) {
+    document.getElementById('cadPosicao').value = pos;
+    document.getElementById('displayPosicao').textContent = pos;
+    document.getElementById('displayPosicao').style.color = "var(--color-primary)";
+    // Renderiza de novo só para pintar a cor da nova seleção
+    gerarGridSelecaoPosicao(posicaoDoHelioAtual); 
 }
 
-// Função para salvar (Novo ou Edição)
-async function salvarBase() {
-    const id = document.getElementById('baseId').value;
+// ================= SALVAR (POST / PUT) =================
+
+async function salvarHeliostato() {
+    if (currentProfile !== 'Administrador') return alert("Acesso Negado.");
     
-    const payload = {
-        usuario_solicitante: currentUserLogin, // NOVO
-        nome: document.getElementById('baseNome').value, 
-        ip: document.getElementById('baseIp').value,
-        porta: document.getElementById('basePort').value,
-        alpha: document.getElementById('baseAlpha').value,
-        beta: document.getElementById('baseBeta').value,
-        theta: document.getElementById('baseTheta').value
-    };
-
-    if (!payload.nome || !payload.ip) {
-        alert("Preencha o Número e o IP!");
-        return;
+    const numInput = document.getElementById('cadNumero');
+    const numero = parseInt(numInput.value);
+    
+    if (isNaN(numero) || numero < 0 || numero > 999) {
+        return alert("O Número do heliostato deve ser entre 0 e 999.");
     }
-
-    const url = id ? `/api/bases/${id}` : '/api/bases';
-    const method = id ? 'PUT' : 'POST';
-
+    
+    // Coleta os dados do Formulário
+    const payload = {
+        numero: numero,
+        usuario_solicitante: currentUserLogin,
+        ip: document.getElementById('cadIP').value.trim(),
+        porta: parseInt(document.getElementById('cadPorta').value) || 502,
+        posicao: parseInt(document.getElementById('cadPosicao').value) || null,
+        theta: parseFloat(document.getElementById('cadTheta').value) || 0.0,
+        phi: parseFloat(document.getElementById('cadPhi').value) || 0.0,
+        taxa_atualizacao: parseInt(document.getElementById('cadTaxa').value) || 5000
+    };
+    
+    const isEdit = numInput.disabled; // Se o campo número está bloqueado, é uma Edição
+    
+    // Se for Novo, verifica preventivamente se já não existe
+    if (!isEdit && listaBasesCache.some(b => b.numero === numero)) {
+        return alert(`Já existe um heliostato cadastrado com o número ${numero}!`);
+    }
+    
     try {
-        const res = await fetch(url, {
+        const url = isEdit ? `/api/bases/${numero}` : `/api/bases`;
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
             method: method,
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         
-        const json = await res.json();
-        if (json.ok) {
-            alert("Salvo com sucesso!");
-            carregarListaBases(); 
-            resetFormBase();      
+        const res = await response.json();
+        
+        if (res.ok) {
+            fecharModalCadastroHeliostato();
+            await carregarListaBases(); // Atualiza a tabela imediatamente
+            if (typeof gerarGridHeliostatos === 'function') {
+                gerarGridHeliostatos(); // Atualiza o Dashboard imediatamente
+            }
         } else {
-            alert("Erro ao salvar: " + json.erro);
+            alert("Erro ao salvar: " + (res.erro || "Desconhecido"));
         }
     } catch (e) {
-        console.error(e);
-        alert("Erro de comunicação.");
+        console.error("Erro requisição:", e);
+        alert("Erro de conexão ao tentar salvar.");
     }
 }
 
-// Função auxiliar para limpar o formulário
-function resetFormBase() {
-    document.getElementById('baseId').value = '';
-    document.getElementById('baseSelect').value = '';
-    document.getElementById('baseNome').value = '';
-    document.getElementById('baseIp').value = '';
-    document.getElementById('basePort').value = '502';
-    
-    document.getElementById('baseAlpha').value = '';
-    document.getElementById('baseBeta').value = '';
-    document.getElementById('baseTheta').value = '';
-}
-
-
-async function apagarBase() {
-    const id = document.getElementById('baseId').value;
-    if (!id) return alert("Selecione um heliostato para excluir.");
-    
-    if (confirm("Tem certeza que deseja excluir este heliostato?")) {
-        // CORREÇÃO: Usar currentUserLogin (admin) e não currentUser (Administrador)
-        const res = await API.deletarBase(id, currentUserLogin);
-        
-        if (res.ok) { 
-            alert("Heliostato excluído."); 
-            resetFormBase(); 
-            carregarListaBases(); 
-        } else {
-            alert("Erro ao excluir: " + res.erro);
-        }
-    }
-}
 
 // ================= HISTÓRICO ALARMES =================
 async function abrirHistoricoAlarmes() {
