@@ -1037,12 +1037,12 @@ async function baixarPDF() {
 }
 
 
-// ================= BLOCO HELIOSTATOS (Copie e substitua tudo aqui) =================
+
 
 let currentHelioID = null;
 timerModalHelio = null;
 
-// 1. GERA O GRID (Resolve o problema do Vermelho)
+// 1. GERA O GRID 
 async function gerarGridHeliostatos() {
     const grid = document.getElementById('heliostatosGrid');
     if (!grid) return;
@@ -1052,7 +1052,9 @@ async function gerarGridHeliostatos() {
         grid.style.display = 'flex';
         grid.style.flexDirection = 'column';
         grid.style.alignItems = 'center'; 
-        grid.style.gap = '5px'; 
+        // Reduzi o gap minimamente (de 5px para 4px) apenas para garantir que 
+        // a 8ª linha caiba perfeitamente sem alterar o tamanho do card pai.
+        grid.style.gap = '4px'; 
     }
 
     let configurados = {};
@@ -1067,13 +1069,14 @@ async function gerarGridHeliostatos() {
     // Limpa HTML para garantir que não haja lixo visual
     grid.innerHTML = ''; 
 
-    const layoutLinhas = [13, 11, 9, 7, 5, 3, 2]; 
+    // --- MUDANÇA DO NOVO LAYOUT (8 linhas) ---
+    const layoutLinhas = [3, 5, 7, 10, 10, 7, 5, 3]; 
     let contadorHeliostato = 1;
 
     layoutLinhas.forEach(qtdNaLinha => {
         const rowDiv = document.createElement('div');
         rowDiv.style.display = 'flex';
-        rowDiv.style.gap = '5px'; 
+        rowDiv.style.gap = '4px'; 
         rowDiv.style.justifyContent = 'center';
 
         for (let i = 0; i < qtdNaLinha; i++) {
@@ -1082,24 +1085,23 @@ async function gerarGridHeliostatos() {
 
             const cell = document.createElement('div');
             cell.className = 'heliostato-cell'; 
-            cell.textContent = idAtual;
             cell.style.backgroundColor = ''; 
 
             const dadosHelio = configurados[idAtual];
 
             if (!dadosHelio) {
-                // --- NÃO EXISTE ---
+                // --- NÃO EXISTE (Deixa sem número) ---
+                cell.textContent = ""; // <--- MUDANÇA: Quadrado em branco
                 cell.classList.add('status-gray');
                 cell.title = "Não Configurado";
                 cell.style.cursor = 'not-allowed';
             } else {
-                // --- EXISTE ---
+                // --- EXISTE (Coloca o número) ---
+                cell.textContent = idAtual; // <--- MUDANÇA: Número real
                 cell.style.cursor = 'pointer';
                 cell.onclick = () => abrirModalHeliostato(idAtual);
 
-                // LÓGICA DE COR:
-                // Se status_code for 1 (Movendo), FORÇA ONLINE (Azul/Verde).
-                // Se status_code for 0, depende do ping (online: true/false).
+                // LÓGICA DE COR MANTIDA INTACTA:
                 let isOnline = (String(dadosHelio.online).toLowerCase() === 'true' || dadosHelio.online == 1);
                 
                 if (dadosHelio.status_code === 1) {
@@ -1151,7 +1153,7 @@ async function abrirModalHeliostato(id) {
     // Zera valores numéricos
     document.getElementById('valAlpha').textContent = "--";
     document.getElementById('valBeta').textContent = "--";
-    document.getElementById('valTheta').textContent = "--";
+    //document.getElementById('valTheta').textContent = "--"; nao vai mais ter
 
     // Bloqueia e limpa inputs
     if (inpAlpha) { inpAlpha.value = ""; inpAlpha.disabled = true; }
@@ -1198,8 +1200,8 @@ async function atualizarDadosModal() {
             // --- ONLINE ---
             document.getElementById('valAlpha').textContent = (dados.alpha || 0).toFixed(2) + '°';
             document.getElementById('valBeta').textContent = (dados.beta || 0).toFixed(2) + '°';
-            document.getElementById('valTheta').textContent = (dados.theta || 0).toFixed(2) + '°';
-            
+            //document.getElementById('valTheta').textContent = (dados.theta || 0).toFixed(2) + '°'; nao vai mais ter por enquanto
+        
             if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
             
             if (dados.status_code === 1) { 
@@ -1242,7 +1244,7 @@ async function atualizarDadosModal() {
             
             document.getElementById('valAlpha').textContent = "--";
             document.getElementById('valBeta').textContent = "--";
-            document.getElementById('valTheta').textContent = "--";
+            //document.getElementById('valTheta').textContent = "--"; standby por hora
 
             // Garante bloqueio
             if(btnMover) {
@@ -1285,6 +1287,12 @@ async function enviarComandoHelio(acao) {
         payload = {
             tipo: 'modo',
             valores: { modo: 0 }
+        };
+    } else if (acao === 'salvar_vetor') {
+        // Dispara o sinal para salvar a posição atual como o Vetor Receptor
+        payload = {
+            tipo: 'salvar_vetor',
+            valores: {}
         };
     }
     
