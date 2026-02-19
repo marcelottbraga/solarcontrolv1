@@ -52,6 +52,12 @@ def iniciar_threads_background():
         t2.daemon = True
         t2.start()
         
+        # --- NOVO: Thread de Gravação Contínua dos Heliostatos ---
+        t3 = threading.Thread(target=services.loop_gravacao_heliostatos, args=(app,))
+        t3.daemon = True
+        t3.start()
+        # ---------------------------------------------------------
+        
         print(f">>> SISTEMA HELIOT: THREADS DE GRAVAÇÃO INICIADAS (PID: {os.getpid()}) <<<")
 
 # Chama a função IMEDIATAMENTE. 
