@@ -1,62 +1,93 @@
 <div id="helioBase" class="screen">
     <div class="form-section">
-        <div class="section-title">Gerenciamento dos Heliostatos</div>
         
-        <input type="hidden" id="baseId">
-
-        <div class="form-row">
-            <div style="grid-column: 1 / -1;">
-                <div class="form-label">Selecione um heliostato para Editar</div>
-                <select id="baseSelect" class="form-input" onchange="carregarBaseSelecionada()">
-                    <option value="">-- Nova Base --</option>
-                </select>
-            </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="section-title" style="margin-bottom: 0;">Gerenciamento dos Heliostatos</div>
+            <button class="btn-primary" onclick="abrirModalNovoHeliostato()">+ NOVO HELIOSTATO</button>
         </div>
 
-        <div class="form-row">
-            <div style="grid-column: 1 / -1;">
-                <div class="form-label">Número do Heliostato (ID 1-50)</div>
-                <input type="number" class="form-input" id="baseNome" placeholder="Ex: 1" min="1" max="50" onchange="validarRange(this)">
-            </div>
-        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr style="background: rgba(255,255,255,0.1); text-align: left;">
+                    <th style="padding: 12px;">Número</th>
+                    <th style="padding: 12px;">IP</th>
+                    <th style="padding: 12px;">Porta</th>
+                    <th style="padding: 12px;">Posição</th>
+                    <th style="padding: 12px;">Theta (θ)</th>
+                    <th style="padding: 12px;">Phi (φ)</th>
+                    <th style="padding: 12px;">Taxa (ms)</th>
+                    <th style="padding: 12px; text-align: center;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaHeliostatosBody">
+                <tr><td colspan="8" style="text-align: center; padding: 20px;">Carregando...</td></tr>
+            </tbody>
+        </table>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <tbody id="tabelaHeliostatosBody">
+                <tr><td colspan="8" style="text-align: center; padding: 20px;">Carregando...</td></tr>
+            </tbody>
+        </table>
 
-        <div class="form-row">
-            <div>
-                <div class="form-label">Endereço IP</div>
-                <input type="text" class="form-input" id="baseIp" placeholder="192.168.x.x">
+    </div>
+    
+   <div id="modalCadastroHeliostato" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 id="modalCadastroTitulo">Novo Heliostato</h3>
+                <span class="close-modal" onclick="fecharModalCadastroHeliostato()">&times;</span>
             </div>
-            <div>
-                <div class="form-label">Porta</div>
-                <input type="number" class="form-input" id="basePort" value="502">
-            </div>
-        </div>
+            
+            <div style="display: flex; gap: 30px; margin-top: 20px; align-items: flex-start;">
+                
+                <div style="flex: 2;">
+                    <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 0;">
+                        <div>
+                            <label class="form-label">Número (0-999)</label>
+                            <input type="number" id="cadNumero" class="form-input" min="0" max="999" placeholder="Ex: 257">
+                        </div>
+                        <div>
+                            <label class="form-label">Taxa Atualização (ms)</label>
+                            <input type="number" id="cadTaxa" class="form-input" value="5000" min="500" step="100">
+                        </div>
+                        <div style="grid-column: span 2;"> <label class="form-label">Endereço IP</label>
+                            <input type="text" id="cadIP" class="form-input" placeholder="Ex: 192.168.1.100">
+                        </div>
+                        <div>
+                            <label class="form-label">Porta Modbus</label>
+                            <input type="number" id="cadPorta" class="form-input" value="502">
+                        </div>
+                        <div>
+                             </div>
+                        <div>
+                            <label class="form-label">Theta (θ)</label>
+                            <input type="number" id="cadTheta" class="form-input" step="0.1" value="0.0">
+                        </div>
+                        <div>
+                            <label class="form-label">Phi (φ)</label>
+                            <input type="number" id="cadPhi" class="form-input" step="0.1" value="0.0">
+                        </div>
+                    </div>
+                </div>
 
-        <div class="form-row">
-            <div>
-                <div class="form-label">Ângulo Alpha (α)</div>
-                <input type="number" step="0.01" class="form-input" id="baseAlpha" placeholder="0.0">
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <label class="form-label" style="margin-bottom: 10px; text-align: center;">
+                        Seleção de Posição<br>
+                        (Atual: <span id="displayPosicao" style="color: var(--color-primary); font-weight: bold;">Nenhuma</span>)
+                    </label>
+                    <input type="hidden" id="cadPosicao" value="">
+                    
+                    <div id="gridSelecaoPosicao" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid #333;">
+                        </div>
+                </div>
             </div>
-            <div>
-                <div class="form-label">Ângulo Beta (β)</div>
-                <input type="number" step="0.01" class="form-input" id="baseBeta" placeholder="0.0">
+            <div style="margin-top: 25px; display: flex; gap: 10px; border-top: 1px solid #333; padding-top: 20px;">
+                <button class="btn-primary" onclick="salvarHeliostato()" style="flex: 1;">SALVAR DADOS</button>
+                <button class="btn-secondary" onclick="fecharModalCadastroHeliostato()" style="flex: 1;">CANCELAR</button>
             </div>
-            <div>
-                <div class="form-label">Ângulo Theta (θ)</div>
-                <input type="number" step="0.01" class="form-input" id="baseTheta" placeholder="0.0">
-            </div>
-        </div>
-                <script>
-                    // Validação simples para manter entre 1 e 50
-                    function validarRange(el) {
-                        if(el.value < 1) el.value = 1;
-                        if(el.value > 50) el.value = 50;
-                    }
-                </script>
-
-        <div class="btn-group" style="margin-top: 20px;">
-            <button class="btn-secondary" onclick="resetFormBase()">LIMPAR / NOVO</button>
-            <button class="btn-danger" onclick="apagarBase()">EXCLUIR</button>
-            <button class="btn-primary" onclick="salvarBase()">SALVAR ALTERAÇÕES</button>
         </div>
     </div>
+    ```
+
+
 </div>
