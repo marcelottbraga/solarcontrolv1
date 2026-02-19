@@ -44,30 +44,29 @@ def logout():
     return jsonify({"ok": True})
 
 # APIs de dados
-@bp.route("/api/dados")
-def api_dados():
-    # Busca o último registro no Banco de Dados (seguro para concorrência)
-    ultimo = Historico.query.order_by(Historico.data_hora.desc()).first()
+
+@bp.route('/api/dados')
+def api_dados_atualizados():
+    # Opção 1: Tenta ler fresco agora mesmo
+    # Isso garante que o dado na tela é o real instantâneo
+    dados_frescos = services.ler_dados_estacao()
     
-    if ultimo:
-        return jsonify({
-            "ok": True,
-            "v_bat": ultimo.v_bat,
-            "ghi1": ultimo.ghi1,
-            "dhi": ultimo.dhi,
-            "bni": ultimo.bni,
-            "old": ultimo.old,
-            "lwd": ultimo.lwd,
-            "vento_vel": ultimo.vento_vel,
-            "vento_dir": ultimo.vento_dir,
-            "temp_ar": ultimo.temp_ar,
-            "umidade_rel": ultimo.umidade_rel,
-            "pressao_atm": ultimo.pressao_atm,
-            "chuva_acum": ultimo.chuva_acum,
-            "ghi2": ultimo.ghi2,
-            "data_hora": ultimo.data_hora.strftime("%d/%m/%Y %H:%M:%S")
-        })
-    return jsonify({"ok": False, "erro": "Aguardando primeira leitura..."})
+    if dados_frescos:
+        dados_frescos['ok'] = True
+        return jsonify(dados_frescos)
+    
+    # Opção 2: Se a leitura falhar (ocupado/timeout), pega o último cache da memória
+    # (Ainda é melhor que ler do banco de dados)
+    cache = services.get_dados_estacao()
+    
+    if cache:
+        return jsonify(cache)
+        
+    # Opção 3: Se tudo falhar
+    return jsonify({
+        "ok": False, 
+        "erro": f"Leitura falhou. Motivo: {services.ultimo_erro_interno}"
+    })
 
 @bp.route("/api/termostatos")
 def api_termostatos():
@@ -155,17 +154,18 @@ def api_status():
 def api_status_cameras():
     return jsonify(services.status_cameras)
 
+
 # API: configuração
+
 @bp.route("/api/config", methods=["GET", "POST"])
 def api_config_geral():
     config = services.carregar_config()
 
     if request.method == "POST":
         data = request.get_json()
-        # Pega o usuário que está solicitando (enviado pelo JS)
         nome_usuario = data.get("usuario_solicitante") or data.get("usuario", "Desconhecido")
         
-        # --- VERIFICAÇÃO DE SEGURANÇA ---
+        # --- 1. VERIFICAÇÃO DE SEGURANÇA ---
         solicitante = Usuario.query.filter_by(usuario=nome_usuario).first()
         perfil = solicitante.perfil if solicitante else 'Visualizador'
 
@@ -173,22 +173,24 @@ def api_config_geral():
              return jsonify({"ok": False, "erro": "Acesso Negado: Visualizadores não podem alterar configurações."})
         
         if perfil == 'Operador':
-            # Operador não pode mexer nestas seções críticas
-            if 'SISTEMA' in data:
+            # Bloqueios específicos de operador
+            if 'SISTEMA' in data or 'sistema' in data:
                  return jsonify({"ok": False, "erro": "Acesso Negado: Operador não pode configurar Rede/Sistema."})
-            if 'ESTACAO' in data:
+            if 'ESTACAO' in data or 'estacao' in data:
                  return jsonify({"ok": False, "erro": "Acesso Negado: Operador não pode configurar Alarmes."})
-            if 'TERMOSTATOS' in data:
-                 return jsonify({"ok": False, "erro": "Acesso Negado: Operador não pode configurar Termostatos."})
-        # -------------------------------
+        # -----------------------------------
 
         alteracoes = []
+        # Lista de seções permitidas
         secoes = ['SISTEMA', 'ESTACAO', 'TERMOSTATOS', 'TEMPOS', 'DASHBOARD_DISPLAY']
         
         for section in secoes:
-            if section.lower() in data:
+            # --- CORREÇÃO AQUI: Tenta pegar MAIÚSCULO (novo JS) ou minúsculo (compatibilidade) ---
+            dados_secao = data.get(section) or data.get(section.lower())
+            
+            if dados_secao:
                 if not config.has_section(section): config.add_section(section)
-                for k, v in data[section.lower()].items():
+                for k, v in dados_secao.items():
                     if v is not None:
                         novo = str(v)
                         atual = config.get(section, k, fallback="")
@@ -196,12 +198,15 @@ def api_config_geral():
                             config.set(section, k, novo)
                             alteracoes.append(f"{k}: {atual}->{novo}")
         
-        if alteracoes:
+        # Só salva se houve alterações ou se for forçado (para garantir)
+        if alteracoes or data: 
             services.salvar_config_arquivo(config)
             services.registrar_evento(current_app._get_current_object(), nome_usuario, "CONFIG", f"Alterou: {', '.join(alteracoes)}")
+            print(f"--> Configurações salvas por {nome_usuario}. Alterações: {len(alteracoes)}")
         
         return jsonify({"ok": True})
     else:
+        # GET: Retorna o arquivo atual
         return jsonify({s: dict(config.items(s)) for s in config.sections()})
 
 @bp.route("/api/comando", methods=["POST"])
@@ -587,70 +592,77 @@ def api_comando_heliostato(id_helio):
 
     # --- NOVAS ROTAS DE CONFIGURAÇÃO ---
 
-# 1. Salvar limites de alarme da Estação
-@bp.route('/api/config/limites/salvar', methods=['POST'])
-def api_salvar_limites_clima():
-    # Segurança: Apenas Admins
-    if session.get('perfil') != 'Administrador':
-        return jsonify({'ok': False, 'erro': 'Acesso Negado: Apenas administradores.'}), 403
-
-    try:
-        data = request.get_json()
-        key = data.get('key')
-        v_min = data.get('min')
-        v_max = data.get('max')
-        
-        if not key: return jsonify({'ok': False, 'erro': 'Chave inválida'}), 400
-        
-        config = services.carregar_config()
-        if not config.has_section('ESTACAO'):
-            config.add_section('ESTACAO')
-            
-        if v_min is not None: config.set('ESTACAO', f'{key}_min', str(v_min))
-        else: config.remove_option('ESTACAO', f'{key}_min')
-
-        if v_max is not None: config.set('ESTACAO', f'{key}_max', str(v_max))
-        else: config.remove_option('ESTACAO', f'{key}_max')
-        
-        # --- CORREÇÃO DO NOME DA FUNÇÃO ---
-        services.salvar_config_arquivo(config)
-        
-        return jsonify({'ok': True})
-
-    except Exception as e:
-        return jsonify({'ok': False, 'erro': str(e)}), 500
-
-
-# 2. Salvar Configurações Gerais (Tela Sistema)
 @bp.route('/api/config/salvar', methods=['POST'])
 def api_salvar_config_geral():
     if session.get('perfil') != 'Administrador':
-        return jsonify({'ok': False, 'erro': 'Acesso Negado: Apenas administradores.'}), 403
+        return jsonify({'ok': False, 'erro': 'Acesso Negado.'}), 403
 
     data = request.get_json()
-    tempo_estacao = data.get('tempo_estacao')
-    tempo_term = data.get('tempo_termostatos')
-    
     try:
         config = services.carregar_config()
         
-        if tempo_estacao:
-            config.set('TEMPOS', 'intervalo_gravacao_estacao_segundos', str(tempo_estacao))
-        if tempo_term:
-            config.set('TEMPOS', 'intervalo_gravacao_termostatos_minutos', str(tempo_term))
-            
-        # --- CORREÇÃO DO NOME DA FUNÇÃO ---
-        services.salvar_config_arquivo(config)
+        # 1. Salva Dashboard (se vier no formato 'slots')
+        if 'slots' in data:
+            if not config.has_section('DASHBOARD_DISPLAY'): config.add_section('DASHBOARD_DISPLAY')
+            for k, v in data['slots'].items():
+                config.set('DASHBOARD_DISPLAY', k, str(v))
         
+        # 2. Salva Tempos (se vier solto)
+        if data.get('tempo_estacao'):
+            if not config.has_section('TEMPOS'): config.add_section('TEMPOS')
+            config.set('TEMPOS', 'intervalo_gravacao_estacao_segundos', str(data.get('tempo_estacao')))
+            
+        services.salvar_config_arquivo(config)
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
 
-# Buscar limites atuais (Para preencher o modal da engrenagem)
-@bp.route('/api/config/limites/<key>')
-def api_get_limites_clima(key):
-    config = services.carregar_config()
-    v_min = config.getfloat('ESTACAO', f'{key}_min', fallback=None)
-    v_max = config.getfloat('ESTACAO', f'{key}_max', fallback=None)
-    return jsonify({'ok': True, 'min': v_min, 'max': v_max})
+@bp.route('/api/config/limites/salvar', methods=['POST'])
+def api_salvar_limites_clima():
+    # Se Operadores também puderem ajustar alarmes, mude para: 
+    # if session.get('perfil') not in ['Administrador', 'Operador']:
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado.'}), 403
+        
+    data = request.get_json()
+    key = data.get('key')
+    try:
+        config = services.carregar_config()
+        if not config.has_section('ESTACAO'): config.add_section('ESTACAO')
+            
+        if data.get('min') is not None: config.set('ESTACAO', f'{key}_min', str(data['min']))
+        else: config.remove_option('ESTACAO', f'{key}_min')
 
+        if data.get('max') is not None: config.set('ESTACAO', f'{key}_max', str(data['max']))
+        else: config.remove_option('ESTACAO', f'{key}_max')
+        
+        services.salvar_config_arquivo(config)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
+
+@bp.route('/api/sessao')
+def api_sessao():
+    return jsonify({
+        'ok': True,
+        'nome': session.get('nome', 'Visitante'),
+        'perfil': session.get('perfil', 'Visualizador') # Se cair a sessão, vira Visualizador
+    })
+
+# --- ROTA DE DEBUG (Adicione no final do routes.py) ---
+@bp.route('/api/debug/estacao')
+def api_debug_estacao():
+    # Tenta ler a estação DIRETAMENTE (sem passar pelo banco)
+    dados = services.ler_dados_estacao()
+    
+    if dados:
+        # Se leu, mostra tudo (incluindo o debug_raw que você adicionou antes)
+        return jsonify(dados)
+    else:
+        # Se falhou, mostra o motivo exato que o services.py guardou
+        return jsonify({
+            "ok": False, 
+            "erro_real": services.ultimo_erro_interno,
+            "dica": "Verifique IP, Porta e se o Simulador está rodando."
+        })

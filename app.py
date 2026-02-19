@@ -36,7 +36,9 @@ app.register_blueprint(routes_bp)
 
 thread_iniciada_global = False
 
-if __name__ == "__main__":
+def iniciar_threads_background():
+    global thread_iniciada_global
+    # Verifica se as threads já foram iniciadas (evita duplicidade no reload)
     if not thread_iniciada_global:
         thread_iniciada_global = True
         
@@ -45,11 +47,17 @@ if __name__ == "__main__":
         t1.daemon = True
         t1.start()
 
-        # Thread Unificada: Monitora Emergência (1s) e Grava Termostatos (5min)
+        # Thread Unificada: Monitora Emergência e Grava Termostatos
         t2 = threading.Thread(target=services.loop_termostatos_e_emergencia, args=(app,))
         t2.daemon = True
         t2.start()
         
-        print(f">>> SISTEMA HELIOT INICIADO (PID: {os.getpid()}) <<<")
-    
+        print(f">>> SISTEMA HELIOT: THREADS DE GRAVAÇÃO INICIADAS (PID: {os.getpid()}) <<<")
+
+# Chama a função IMEDIATAMENTE. 
+# Assim, mesmo rodando via Gunicorn (Docker), as threads ligam!
+iniciar_threads_background()
+
+# Mantém o main apenas para testes locais no Windows/Linux sem Docker
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
