@@ -43,7 +43,8 @@ class Historico(db.Model):
     umidade_rel = db.Column(db.Float)    # UR (%) - Reg 40019
     pressao_atm = db.Column(db.Float)    # Pres (mbar) - Reg 40021
     chuva_acum = db.Column(db.Float)     # Chuva (mm) - Reg 40023
-    ghi2 = db.Column(db.Float)           # GHI2 (W/m²) - Reg 40025
+    cell_irrad = db.Column(db.Float)     #Irradiacao Global Horiz - Reg 40025
+    cell_temp = db.Column(db.Float)      #Temperat Celia de Refer - Reg 40027
 
 # Modelo: Histórico dos termopares
 class HistoricoTermopares(db.Model):

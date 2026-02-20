@@ -353,11 +353,11 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
             writer.writerow([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), r.categoria, r.mensagem])
 
     elif tipo == 'weather':
-        # Novas colunas (14 campos)
         writer.writerow([
-            'Data/Hora', 'Bateria (V)', 'GHI 1 (W/m2)', 'DHI (W/m2)', 'BNI (W/m2)', 
+            'Data/Hora', 'Bateria (V)', 'GHI1 (W/m2)', 'DHI (W/m2)', 'BNI (W/m2)', 
             'OLD (W/m2)', 'LWD (W/m2)', 'Vento Vel. (m/s)', 'Vento Dir. (°)', 
-            'Temp. Ar (°C)', 'Umidade Rel. (%)', 'Pressão Atm. (mbar)', 'Chuva Acum. (mm)', 'GHI 2 (W/m2)'
+            'Temp. Ar (°C)', 'Umidade Rel. (%)', 'Pressão Atm. (mbar)', 'Chuva Acum. (mm)', 
+            'Cell Irrad. (W/m2)', 'Cell Temp. (°C)'
         ])
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
@@ -367,7 +367,7 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
                 fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
                 fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
-                fmt(r.chuva_acum), fmt(r.ghi2)
+                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp) # <--- AQUI
             ])
 
     elif tipo == 'sensors':
@@ -407,7 +407,7 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
     elif tipo == 'weather':
         titulo = "Histórico da Estação Meteorológica"
         # Nomes mais curtos para caber no PDF
-        colunas = ['Data/Hora', 'Bat.', 'GHI1', 'DHI', 'BNI', 'OLD', 'LWD', 'Vel.Vento', 'Dir.Vento', 'Temp.', 'Umid.', 'Pressão', 'Chuva', 'GHI2']
+        colunas = ['Data/Hora', 'Bat.', 'GHI1', 'DHI', 'BNI', 'OLD', 'LWD', 'Vel.Vento', 'Dir.Vento', 'Temp.', 'Umid.', 'Pressão', 'Chuva', 'Cell_Irr', 'Cell_Tmp']
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
             def fmt(val): return str(val) if val is not None else '--'
@@ -416,7 +416,7 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
                 fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
                 fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
-                fmt(r.chuva_acum), fmt(r.ghi2)
+                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp) # <--- AQUI
             ])
 
     # Renderiza HTML
