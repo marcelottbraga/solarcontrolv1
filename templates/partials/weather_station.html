@@ -5,38 +5,30 @@
         <div class="row mb-3" style="display: flex; flex-wrap: wrap; margin: -10px;">
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('ghi1', 'W/m²')">⚙️</button>
-                        <div class="card-title">GHI 1 (Global)</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">GHI1 - Irrad. Global Horiz.</div></div>
                     <div class="card-value" id="val-ghi1">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('ghi1', 'W/m²')">⚙️</button></div>
                 </div>
             </div>
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('bni', 'W/m²')">⚙️</button>
-                        <div class="card-title">BNI (Direta)</div>
-                    </div>
-                    <div class="card-value" id="val-bni">-- W/m²</div>
-                </div>
-            </div>
-            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
-                <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('dhi', 'W/m²')">⚙️</button>
-                        <div class="card-title">DHI (Difusa)</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">DHI - Irrad. Difusa Horiz.</div></div>
                     <div class="card-value" id="val-dhi">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('dhi', 'W/m²')">⚙️</button></div>
                 </div>
             </div>
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('ghi2', 'W/m²')">⚙️</button>
-                        <div class="card-title">GHI 2 (Sec)</div>
-                    </div>
-                    <div class="card-value" id="val-ghi2">-- W/m²</div>
+                    <div class="card-header-row"><div class="card-title">BNI - Irrad. Normal Direta</div></div>
+                    <div class="card-value" id="val-bni">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('bni', 'W/m²')">⚙️</button></div>
+                </div>
+            </div>
+            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
+                <div class="weather-data-card">
+                    <div class="card-header-row"><div class="card-title">Cell_Irrad - Irrad. Global Horiz.</div></div>
+                    <div class="card-value" id="val-cell_irrad">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('cell_irrad', 'W/m²')">⚙️</button></div>
                 </div>
             </div>
         </div>
@@ -44,38 +36,30 @@
         <div class="row mb-3" style="display: flex; flex-wrap: wrap; margin: -10px;">
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('vento_vel', 'm/s')">⚙️</button>
-                        <div class="card-title">Vel. Vento</div>
-                    </div>
-                    <div class="card-value" id="val-vento_vel">-- m/s</div>
+                    <div class="card-header-row"><div class="card-title">OLD - Irrad. Onda Longa Desc.</div></div>
+                    <div class="card-value" id="val-old">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('old', 'W/m²')">⚙️</button></div>
                 </div>
             </div>
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('vento_dir', '°')">⚙️</button>
-                        <div class="card-title">Dir. Vento</div>
-                    </div>
-                    <div class="card-value" id="val-vento_dir">-- °</div>
-                </div>
-            </div>
-            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
-                <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('chuva_acum', 'mm')">⚙️</button>
-                        <div class="card-title">Chuva Acum.</div>
-                    </div>
-                    <div class="card-value" id="val-chuva_acum">-- mm</div>
-                </div>
-            </div>
-            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
-                <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('lwd', 'W/m²')">⚙️</button>
-                        <div class="card-title">LWD</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">LWD - Irrad. Onda Longa Desc.</div></div>
                     <div class="card-value" id="val-lwd">-- W/m²</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('lwd', 'W/m²')">⚙️</button></div>
+                </div>
+            </div>
+            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
+                <div class="weather-data-card">
+                    <div class="card-header-row"><div class="card-title">Vel - Velocidade do Vento</div></div>
+                    <div class="card-value" id="val-vento_vel">-- m/s</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('vento_vel', 'm/s')">⚙️</button></div>
+                </div>
+            </div>
+            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
+                <div class="weather-data-card">
+                    <div class="card-header-row"><div class="card-title">Dir - Direção do Vento</div></div>
+                    <div class="card-value" id="val-vento_dir">-- °</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('vento_dir', '°')">⚙️</button></div>
                 </div>
             </div>
         </div>
@@ -83,38 +67,47 @@
         <div class="row mb-3" style="display: flex; flex-wrap: wrap; margin: -10px;">
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('temp_ar', '°C')">⚙️</button>
-                        <div class="card-title">Temp. Ar</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">Temp - Temperatura do Ar</div></div>
                     <div class="card-value" id="val-temp_ar">-- °C</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('temp_ar', '°C')">⚙️</button></div>
                 </div>
             </div>
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('umidade_rel', '%')">⚙️</button>
-                        <div class="card-title">Umidade</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">UR - Umidade Rel. do Ar</div></div>
                     <div class="card-value" id="val-umidade_rel">-- %</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('umidade_rel', '%')">⚙️</button></div>
                 </div>
             </div>
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('pressao_atm', 'mbar')">⚙️</button>
-                        <div class="card-title">Pressão</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title">Pres - Pressão Atmosférica</div></div>
                     <div class="card-value" id="val-pressao_atm">-- mbar</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('pressao_atm', 'mbar')">⚙️</button></div>
                 </div>
             </div>
+            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
+                <div class="weather-data-card">
+                    <div class="card-header-row"><div class="card-title">Prec - Precipitação Acum.</div></div>
+                    <div class="card-value" id="val-chuva_acum">-- mm</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('chuva_acum', 'mm')">⚙️</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3" style="display: flex; flex-wrap: wrap; margin: -10px;">
             <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
                 <div class="weather-data-card" style="border-color: var(--color-warning);">
-                    <div class="card-header-row">
-                        <button class="btn-config-mini" onclick="openWeatherAlarmModal('v_bat', 'V')">⚙️</button>
-                        <div class="card-title" style="color: var(--color-warning);">Bateria</div>
-                    </div>
+                    <div class="card-header-row"><div class="card-title" style="color: var(--color-warning);">Tensão da Bateria</div></div>
                     <div class="card-value" id="val-v_bat" style="color: var(--color-warning);">-- V</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('v_bat', 'V')">⚙️</button></div>
+                </div>
+            </div>
+            <div class="col-md-3" style="width: 25%; padding: 10px; box-sizing: border-box;">
+                <div class="weather-data-card">
+                    <div class="card-header-row"><div class="card-title">Cell_Temp - Temp. Célula de Ref.</div></div>
+                    <div class="card-value" id="val-cell_temp">-- °C</div>
+                    <div style="text-align: right; margin-top: 5px;"><button class="btn-config-mini" onclick="openWeatherAlarmModal('cell_temp', '°C')">⚙️</button></div>
                 </div>
             </div>
         </div>

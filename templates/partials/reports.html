@@ -54,12 +54,10 @@
             </div>
         </div>
 
-        <div class="btn-group" style="margin-top: 20px;">
-            <button id="btnVisualizarTela" class="btn-primary" onclick="gerarRelatorioTela()">🔍 Visualizar na Tela</button>
-            
-            <button class="btn-secondary" onclick="baixarCSV()">📥 Exportar CSV (Excel)</button>
-            
-            <button id="btnExportarPDF" class="btn-danger" onclick="baixarPDF()">📄 Exportar PDF</button>
+        <div class="btn-group" style="margin-top: 20px; display: flex; justify-content: space-between; gap: 15px; width: 100%;">
+            <button id="btnVisualizarTela" class="btn-primary" style="flex: 1;" onclick="gerarRelatorioTela()">🔍 Visualizar na Tela</button>
+            <button class="btn-secondary" style="flex: 1;" onclick="baixarCSV()">📥 Exportar CSV (Excel)</button>
+            <button id="btnExportarPDF" class="btn-danger" style="flex: 1;" onclick="baixarPDF()">📄 Exportar PDF</button>
         </div>
 
         <div id="previewArea" style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
