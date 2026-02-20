@@ -283,11 +283,20 @@ async function atualizarDados() {
     if(typeof alarmesGlobais !== 'undefined') alarmesGlobais.estacao = [];
 
     const mapaIds = {
-        'ghi1': 'val-ghi1', 'bni': 'val-bni', 'dhi': 'val-dhi', 'ghi2': 'val-ghi2',
-        'vento_vel': 'val-vento_vel', 'vento_dir': 'val-vento_dir', 
-        'chuva_acum': 'val-chuva_acum', 'lwd': 'val-lwd', 'old': 'val-old',
-        'temp_ar': 'val-temp_ar', 'umidade_rel': 'val-umidade_rel', 
-        'pressao_atm': 'val-pressao_atm', 'v_bat': 'val-v_bat'
+        'ghi1': 'val-ghi1', 
+        'bni': 'val-bni', 
+        'dhi': 'val-dhi', 
+        'cell_irrad': 'val-cell_irrad', 
+        'cell_temp': 'val-cell_temp',   
+        'vento_vel': 'val-vento_vel', 
+        'vento_dir': 'val-vento_dir', 
+        'chuva_acum': 'val-chuva_acum', 
+        'lwd': 'val-lwd', 
+        'old': 'val-old',
+        'temp_ar': 'val-temp_ar', 
+        'umidade_rel': 'val-umidade_rel', 
+        'pressao_atm': 'val-pressao_atm', 
+        'v_bat': 'val-v_bat'
     };
 
     for (const [key, idElemento] of Object.entries(mapaIds)) {
