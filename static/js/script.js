@@ -16,16 +16,17 @@ const weatherMeta = {
     'ghi1': { label: 'GHI 1 (Global)', unit: ' W/m²' },
     'bni': { label: 'BNI (Direta)', unit: ' W/m²' },
     'dhi': { label: 'DHI (Difusa)', unit: ' W/m²' },
-    'ghi2': { label: 'GHI 2', unit: ' W/m²' },
-    'lwd': { label: 'LWD', unit: ' W/m²' },
-    'old': { label: 'OLD', unit: ' W/m²' },
+    'cell_irrad': { label: 'Cell_Irrad', unit: ' W/m²' }, // <--- Antigo ghi2 alterado aqui
+    'old': { label: 'OLD (Onda Longa Emit.)', unit: ' W/m²' },
+    'lwd': { label: 'LWD (Onda Longa Desc.)', unit: ' W/m²' },
     'vento_dir': { label: 'Dir. Vento', unit: '°' },
     'vento_vel': { label: 'Vel. Vento', unit: ' m/s' },
     'chuva_acum': { label: 'Chuva Acum.', unit: ' mm' },
     'temp_ar': { label: 'Temp. Ar', unit: ' °C' },
-    'umidade_rel': { label: 'Umidade', unit: ' %' },
-    'pressao_atm': { label: 'Pressão', unit: ' mbar' },
-    'v_bat': { label: 'Bateria', unit: ' V' }
+    'umidade_rel': { label: 'Umidade Rel.', unit: ' %' },
+    'pressao_atm': { label: 'Pressão Atm.', unit: ' mbar' },
+    'v_bat': { label: 'Bateria', unit: ' V' },
+    'cell_temp': { label: 'Cell_Temp (Célula)', unit: ' °C' } // <--- Novo sensor adicionado aqui
 };
 
 
@@ -895,17 +896,22 @@ function toggleReportOptions() {
 
     const btnView = document.getElementById('btnVisualizarTela');
     const previewArea = document.getElementById('previewArea');
+    
+    // MUDANÇA: Usa 'visibility' em vez de 'display' para segurar o espaço do botão
     if (tipo === 'weather' || tipo === 'sensors') {
-        btnView.style.display = 'none';
+        btnView.style.visibility = 'hidden'; 
         previewArea.style.display = 'none';
     } else {
-        btnView.style.display = 'inline-block';
+        btnView.style.visibility = 'visible';
         previewArea.style.display = 'block';
     }
 
     const btnPDF = document.getElementById('btnExportarPDF');
-    if (tipo === 'sensors') btnPDF.style.display = 'none';
-    else btnPDF.style.display = 'inline-block';
+    if (tipo === 'sensors') {
+        btnPDF.style.visibility = 'hidden'; 
+    } else {
+        btnPDF.style.visibility = 'visible';
+    }
 }
 
 async function buscarDadosRelatorio() {
