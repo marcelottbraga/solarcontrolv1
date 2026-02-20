@@ -541,7 +541,7 @@ async function carregarConfiguracoes() {
         }
     }
 
-    // 4. DASHBOARD (CORREÇÃO AQUI: Ler do arquivo, não do cache)
+    // 4. DASHBOARD
     const dash = dados.DASHBOARD_DISPLAY;
     if (dash) {
         // Atualiza a variável global com o que veio do arquivo
@@ -550,12 +550,12 @@ async function carregarConfiguracoes() {
         dashboardSlots.slot3 = dash.slot3 || 'vento_vel';
         dashboardSlots.slot4 = dash.slot4 || 'vento_dir';
 
-        // Atualiza os Dropdowns na tela Sistema (IDs: cfg_dash_slot...)
+        // MUDANÇA: Atualiza os Dropdowns na tela Sistema com os IDs corretos (dash_slot_X)
         const safeSetDash = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
-        safeSetDash('cfg_dash_slot1', dashboardSlots.slot1);
-        safeSetDash('cfg_dash_slot2', dashboardSlots.slot2);
-        safeSetDash('cfg_dash_slot3', dashboardSlots.slot3);
-        safeSetDash('cfg_dash_slot4', dashboardSlots.slot4);
+        safeSetDash('dash_slot_1', dashboardSlots.slot1);
+        safeSetDash('dash_slot_2', dashboardSlots.slot2);
+        safeSetDash('dash_slot_3', dashboardSlots.slot3);
+        safeSetDash('dash_slot_4', dashboardSlots.slot4);
 
         // Força atualização visual imediata
         if (typeof atualizarTitulosDashboard === 'function') {
@@ -1527,29 +1527,52 @@ async function salvarHeliostato() {
     if (currentProfile !== 'Administrador') return alert("Acesso Negado.");
     
     const numInput = document.getElementById('cadNumero');
-    const numero = parseInt(numInput.value);
+    const numeroStr = numInput.value.trim();
+    
+    // --- 1. VALIDAÇÕES RÍGIDAS DE CAMPOS EM BRANCO ---
+    if (!numeroStr) return alert("⚠️ Erro: Falta o campo 'Número'. Ele não pode ficar vazio.");
+    const numero = parseInt(numeroStr);
     
     if (isNaN(numero) || numero < 0 || numero > 999) {
-        return alert("O Número do heliostato deve ser entre 0 e 999.");
+        return alert("⚠️ Erro: O 'Número' do heliostato deve ser entre 0 e 999.");
     }
     
-    // Coleta os dados do Formulário
+    const ip = document.getElementById('cadIP').value.trim();
+    if (!ip) return alert("⚠️ Erro: Falta o campo 'Endereço IP'.");
+
+    const portaStr = document.getElementById('cadPorta').value.trim();
+    if (!portaStr) return alert("⚠️ Erro: Falta o campo 'Porta Modbus'.");
+
+    const taxaStr = document.getElementById('cadTaxa').value.trim();
+    if (!taxaStr) return alert("⚠️ Erro: Falta o campo 'Taxa de Atualização'.");
+
+    const thetaStr = document.getElementById('cadTheta').value.trim();
+    if (!thetaStr) return alert("⚠️ Erro: Falta o campo 'Theta (θ)'.");
+
+    const phiStr = document.getElementById('cadPhi').value.trim();
+    if (!phiStr) return alert("⚠️ Erro: Falta o campo 'Phi (φ)'.");
+
+    const posicaoStr = document.getElementById('cadPosicao').value.trim();
+    if (!posicaoStr) return alert("⚠️ Erro: Falta selecionar uma 'Posição' no mapa visual.");
+    // -------------------------------------------------
+
+    // Coleta os dados validados e já garantidos que não estão vazios
     const payload = {
         numero: numero,
         usuario_solicitante: currentUserLogin,
-        ip: document.getElementById('cadIP').value.trim(),
-        porta: parseInt(document.getElementById('cadPorta').value) || 502,
-        posicao: parseInt(document.getElementById('cadPosicao').value) || null,
-        theta: parseFloat(document.getElementById('cadTheta').value) || 0.0,
-        phi: parseFloat(document.getElementById('cadPhi').value) || 0.0,
-        taxa_atualizacao: parseInt(document.getElementById('cadTaxa').value) || 5000
+        ip: ip,
+        porta: parseInt(portaStr),
+        posicao: parseInt(posicaoStr),
+        theta: parseFloat(thetaStr),
+        phi: parseFloat(phiStr),
+        taxa_atualizacao: parseInt(taxaStr)
     };
     
-    const isEdit = numInput.disabled; // Se o campo número está bloqueado, é uma Edição
+    const isEdit = numInput.disabled; 
     
-    // Se for Novo, verifica preventivamente se já não existe
-    if (!isEdit && listaBasesCache.some(b => b.numero === numero)) {
-        return alert(`Já existe um heliostato cadastrado com o número ${numero}!`);
+    // --- 2. VERIFICAÇÃO DE DUPLICIDADE NO FRONTEND ---
+    if (!isEdit && listaBasesCache.some(b => String(b.numero) === String(numero))) {
+        return alert(`⚠️ Erro: Já existe um heliostato cadastrado com o número ${numero}!`);
     }
     
     try {
@@ -1566,16 +1589,17 @@ async function salvarHeliostato() {
         
         if (res.ok) {
             fecharModalCadastroHeliostato();
-            await carregarListaBases(); // Atualiza a tabela imediatamente
+            await carregarListaBases(); 
             if (typeof gerarGridHeliostatos === 'function') {
-                gerarGridHeliostatos(); // Atualiza o Dashboard imediatamente
+                gerarGridHeliostatos(); 
             }
         } else {
-            alert("Erro ao salvar: " + (res.erro || "Desconhecido"));
+            // Caso escape algum erro do Python, exibe de forma limpa
+            alert("❌ Erro ao salvar: " + (res.erro || "Falha desconhecida."));
         }
     } catch (e) {
         console.error("Erro requisição:", e);
-        alert("Erro de conexão ao tentar salvar.");
+        alert("❌ Erro de conexão com o servidor ao tentar salvar.");
     }
 }
 
