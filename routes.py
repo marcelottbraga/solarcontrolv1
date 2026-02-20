@@ -278,20 +278,28 @@ def criar_base():
         return jsonify({"ok": False, "erro": "Acesso Negado: Apenas Administradores podem criar heliostatos."})
 
     try:
+        numero_int = int(data.get('numero'))
+        
+        # --- BLINDAGEM DE DUPLICIDADE NO BACKEND ---
+        existente = HeliostatoCadastro.query.filter_by(numero=numero_int).first()
+        if existente:
+            return jsonify({"ok": False, "erro": f"O heliostato número {numero_int} já está cadastrado!"})
+            
         nova_base = HeliostatoCadastro(
-            numero=int(data.get('numero')),
+            numero=numero_int,
             ip=data.get('ip'),
-            porta=int(data.get('porta', 502)),
+            porta=int(data.get('porta', 502)) if data.get('porta') else 502,
             posicao=int(data.get('posicao')) if data.get('posicao') else None,
-            theta=float(data.get('theta', 0.0)),
-            phi=float(data.get('phi', 0.0)),
-            taxa_atualizacao=int(data.get('taxa_atualizacao', 5))
+            theta=float(data.get('theta', 0.0)) if data.get('theta') is not None else 0.0,
+            phi=float(data.get('phi', 0.0)) if data.get('phi') is not None else 0.0,
+            taxa_atualizacao=int(data.get('taxa_atualizacao', 5000)) if data.get('taxa_atualizacao') else 5000
         )
         db.session.add(nova_base)
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "erro": str(e)})
+        print(f"Erro BD (Criar): {e}")
+        return jsonify({"ok": False, "erro": "Falha interna no Banco de Dados. Verifique se digitou letras em campos numéricos."})
 
 @bp.route('/api/bases/<int:numero>', methods=['PUT'])
 def atualizar_base(numero):
@@ -305,16 +313,17 @@ def atualizar_base(numero):
     base = HeliostatoCadastro.query.get_or_404(numero)
     try:
         base.ip = data.get('ip', base.ip)
-        base.porta = int(data.get('porta', base.porta))
+        base.porta = int(data.get('porta')) if data.get('porta') else base.porta
         base.posicao = int(data.get('posicao')) if data.get('posicao') else base.posicao
-        base.theta = float(data.get('theta', base.theta))
-        base.phi = float(data.get('phi', base.phi))
-        base.taxa_atualizacao = int(data.get('taxa_atualizacao', base.taxa_atualizacao))
+        base.theta = float(data.get('theta')) if data.get('theta') is not None else base.theta
+        base.phi = float(data.get('phi')) if data.get('phi') is not None else base.phi
+        base.taxa_atualizacao = int(data.get('taxa_atualizacao')) if data.get('taxa_atualizacao') else base.taxa_atualizacao
         
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "erro": str(e)})
+        print(f"Erro BD (Atualizar): {e}")
+        return jsonify({"ok": False, "erro": "Falha interna no Banco de Dados. Verifique os valores inseridos."})
 
 @bp.route('/api/bases/<int:numero>', methods=['DELETE'])
 def deletar_base(numero):
