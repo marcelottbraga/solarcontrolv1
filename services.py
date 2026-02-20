@@ -81,9 +81,9 @@ def ler_dados_estacao():
     
     if client.connect():
         try:
-            # Lê 26 registradores (13 variáveis * 2 registradores de 16-bit cada)
+            # Lê 28 registradores (1314 variáveis * 2 registradores de 16-bit cada)
             # Endereço 0 corresponde ao 40001
-            rr = client.read_holding_registers(address=0, count=26, slave=slave_id)
+            rr = client.read_holding_registers(address=0, count=28, slave=slave_id)
             
             if not rr.isError():
                 # Decodifica os bytes brutos para Float 32-bit
@@ -106,7 +106,8 @@ def ler_dados_estacao():
                     'umidade_rel': round(decoder.decode_32bit_float(), 2), # 40019-40020
                     'pressao_atm': round(decoder.decode_32bit_float(), 2), # 40021-40022
                     'chuva_acum': round(decoder.decode_32bit_float(), 2),  # 40023-40024
-                    'ghi2': round(decoder.decode_32bit_float(), 2)         # 40025-40026
+                    'cell_irrad': round(decoder.decode_32bit_float(), 2),  # 40025-40026
+                    'cell_temp': round(decoder.decode_32bit_float(), 2)    # 40027-40028 
                 }
                 dados['debug_raw'] = rr.registers
                 checar_limites_estacao(dados, config)
@@ -141,7 +142,8 @@ def checar_limites_estacao(dados, config):
         'umidade_rel': ('umidade_rel', 'Umidade'),
         'pressao_atm': ('pressao_atm', 'Pressão'),
         'chuva_acum': ('chuva_acum', 'Chuva Acum.'),
-        'ghi2': ('ghi2', 'GHI2')
+        'cell_irrad': ('cell_irrad', 'Cell Irrad.'),
+        'cell_temp': ('cell_temp', 'Temp. Célula')  
     }
 
     try:
@@ -198,7 +200,8 @@ def loop_gravacao_estacao(app):
                         umidade_rel=dados.get('umidade_rel'),
                         pressao_atm=dados.get('pressao_atm'),
                         chuva_acum=dados.get('chuva_acum'),
-                        ghi2=dados.get('ghi2'),
+                        cell_irrad=dados.get('cell_irrad'),
+                        cell_temp=dados.get('cell_temp'),
                         data_hora=datetime.now()
                     )
                     db.session.add(h)
