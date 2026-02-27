@@ -49,7 +49,7 @@ const API = {
     // --- COMANDOS E CONFIGURAÇÃO ---
     getConfig: async () => {
         try {
-            const resp = await fetch('/api/config');
+            const resp = await fetch('/api/config?t=' + new Date().getTime());
             return await resp.json();
         } catch (e) { return null; }
     },

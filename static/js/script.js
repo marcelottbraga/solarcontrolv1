@@ -525,7 +525,7 @@ async function carregarConfiguracoes() {
         if (elEst) elEst.value = tempos.intervalo_gravacao_estacao_segundos || 60;
 
         const elTerm = document.getElementById('tempo_gravacao_termostatos');
-        if (elTerm) elTerm.value = tempos.intervalo_gravacao_termostatos_minutos;
+        if (elTerm) elTerm.value = tempos.intervalo_gravacao_termostatos_segundos;
     }
 
     // 3. TERMOSTATOS
@@ -625,7 +625,7 @@ async function salvarIPs() {
         // SEÇÃO 2: TEMPOS
         TEMPOS: {
             intervalo_gravacao_estacao_segundos: tEstacao,
-            intervalo_gravacao_termostatos_minutos: tTerm
+            intervalo_gravacao_termostatos_segundos: tTerm
         },
 
         // SEÇÃO 3: DASHBOARD (Usa os IDs corretos dash_slot_X)
@@ -684,6 +684,7 @@ async function generateHeatmap() {
     const dados = await API.getTermostatos();
     const valores = dados.ok ? (dados.valores || []) : [];
 
+    // Chama a verificação de alarme antes de renderizar
     verificarAlarmesTemperatura(valores); 
 
     if (container.children.length === 0) {
@@ -701,18 +702,25 @@ async function generateHeatmap() {
 
         cell.style.background = getColorForTemperature(temp);
         cell.textContent = `${i + 1}`;
-        cell.title = `Sensor ${i + 1}: ${temp}°C`;
-		cell.style.cursor = 'pointer'; 
-		cell.onclick = () => abrirGraficoSensor(i + 1);
+        cell.title = `Sensor ${i + 1}: ${temp.toFixed(1)}°C`;
+        cell.style.cursor = 'pointer'; 
+        cell.onclick = () => abrirGraficoSensor(i + 1);
         
-        if (temp > sensorConfig.max || (sensorConfig.alarmBelowMin && temp < sensorConfig.min)) {
-            cell.style.border = '2px solid #fff';
+        // --- LÓGICA DE DESTAQUE ATUALIZADA ---
+        // Garante comparação numérica correta com sensorConfig
+        const acimaMax = temp > sensorConfig.max;
+        const abaixoMin = sensorConfig.alarmBelowMin && temp < sensorConfig.min;
+
+        if (acimaMax || abaixoMin) {
+            cell.style.border = '2px solid #ffffff'; // Borda branca de destaque
             cell.style.zIndex = '10';
-            cell.style.boxShadow = '0 0 5px rgba(255,255,255,0.8)';
+            cell.style.boxShadow = '0 0 10px rgba(255,255,255,0.9)';
+            cell.style.fontWeight = 'bold';
         } else {
-            cell.style.border = ''; 
-            cell.style.zIndex = '';
-            cell.style.boxShadow = '';
+            cell.style.border = '1px solid rgba(255,255,255,0.1)'; 
+            cell.style.zIndex = '1';
+            cell.style.boxShadow = 'none';
+            cell.style.fontWeight = 'normal';
         }
     }
     carregarListaSensores(valores);
@@ -720,27 +728,45 @@ async function generateHeatmap() {
 
 function verificarAlarmesTemperatura(valores) {
     let sensoresCriticos = 0;
+    
+    // Filtra a lista de valores para contar quantos infringem os limites atuais
     valores.forEach((temp) => {
         if (temp > sensorConfig.max || (sensorConfig.alarmBelowMin && temp < sensorConfig.min)) {
             sensoresCriticos++;
         }
     });
 
+    // Reseta o array de alarmes de termostatos
     alarmesGlobais.termostatos = [];
+
+    // DISPARO DO ALARME: Se a quantidade de sensores em erro for MAIOR que a tolerância
+    // Ex: Se tolerância é 6, precisa de 7 sensores para disparar.
     if (sensoresCriticos > sensorConfig.tolerance) {
         alarmesGlobais.termostatos.push("Termostatos Críticos");
+        console.warn(`[ALARME] ${sensoresCriticos} sensores críticos detectados (Limite: ${sensorConfig.tolerance})`);
     }
+
     atualizarInterfaceAlarmes();
 }
 
 function verificarAlarmesEstacao(dados) {
+    // Reseta o array de alarmes da estação
     alarmesGlobais.estacao = [];
-    for (const [label, limites] of Object.entries(weatherAlarmThresholds)) {
-        const jsonKey = weatherMap[label];
-        const valor = dados[jsonKey];
-        if (valor !== undefined && valor !== null) {
-            if (valor < limites.min) alarmesGlobais.estacao.push(`${label} Baixo`);
-            else if (valor > limites.max) alarmesGlobais.estacao.push(`${label} Alto`);
+
+    // Usa os limites carregados dinamicamente do heliot.config (limitesEstacao)
+    // em vez de weatherAlarmThresholds fixos, se disponível.
+    for (const [key, idElemento] of Object.entries(weatherMeta)) {
+        const valor = dados[key];
+        if (valor === undefined || valor === null) continue;
+
+        const min = parseFloat(limitesEstacao[`${key}_min`]);
+        const max = parseFloat(limitesEstacao[`${key}_max`]);
+
+        if (!isNaN(min) && valor < min) {
+            alarmesGlobais.estacao.push(`${weatherMeta[key].label} Baixo`);
+        }
+        if (!isNaN(max) && valor > max) {
+            alarmesGlobais.estacao.push(`${weatherMeta[key].label} Alto`);
         }
     }
     atualizarInterfaceAlarmes();
@@ -821,13 +847,13 @@ function carregarListaSensores(valores) {
             const card = document.createElement('div');
             card.className = 'weather-data-card';
             card.style.padding = '12px';
-            card.innerHTML = `<div class="card-title">Sensor ${idx+1}</div><div class="card-value" id="temp_sensor_${idx}">${valor} °C</div>`;
+            card.innerHTML = `<div class="card-title">Sensor ${idx+1}</div><div class="card-value" id="temp_sensor_${idx}">${Number(valor).toFixed(1)} °C</div>`;
             container.appendChild(card);
         });
     } else {
         valores.forEach((valor, idx) => {
             const el = document.getElementById(`temp_sensor_${idx}`);
-            if(el) el.textContent = `${valor} °C`;
+            if(el) el.textContent = `${Number(valor).toFixed(1)} °C`;
         });
     }
 }
@@ -2208,6 +2234,7 @@ async function saveWeatherAlarmThresholds() {
         if(data.ok) {
             alert("Salvo com sucesso!");
             closeWeatherAlarmModal();
+            carregarConfiguracoes();
         } else {
             alert("Erro ao salvar: " + (data.erro || 'Erro desconhecido'));
         }
@@ -2251,7 +2278,7 @@ async function salvarConfiguracoesGerais() {
     const payload = {
         'TEMPOS': {
             'intervalo_gravacao_estacao_segundos': tEstacao,
-            'intervalo_gravacao_termostatos_minutos': tTerm
+            'intervalo_gravacao_termostatos_segundos': tTerm
         },
         'DASHBOARD_DISPLAY': { 
             'slot1': s1,
