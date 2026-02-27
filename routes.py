@@ -57,7 +57,7 @@ def api_dados_atualizados():
     
     # Opção 2: Se a leitura falhar (ocupado/timeout), pega o último cache da memória
     # (Ainda é melhor que ler do banco de dados)
-    cache = services.get_dados_estacao()
+    cache = services.ler_dados_estacao()
     
     if cache:
         return jsonify(cache)
