@@ -82,7 +82,9 @@ EOF
         5)
             echo "Fazendo rebuild ONLINE..."
             # Força o pull para garantir que pega a imagem mais nova
-            docker compose up -d --build --pull always
+            # docker compose build --no-cache --pull
+            # docker compose up -d --pull always
+            docker compose up -d --build
             echo "Rebuild online concluído."
             read -p "Pressione Enter..."
             ;;

@@ -48,31 +48,30 @@ class Historico(db.Model):
 
 # Modelo: Histórico dos termopares
 class HistoricoTermopares(db.Model):
-    # Observação: nome da tabela ajustado para o banco de dados
     __tablename__ = 'historico_termopares' 
     
     id = db.Column(db.Integer, primary_key=True)
     data_hora = db.Column(db.DateTime, default=datetime.now)
     
     # Campos: tp1..tp90 (termopares)
-    tp1 = db.Column(db.Integer); tp2 = db.Column(db.Integer); tp3 = db.Column(db.Integer); tp4 = db.Column(db.Integer); tp5 = db.Column(db.Integer)
-    tp6 = db.Column(db.Integer); tp7 = db.Column(db.Integer); tp8 = db.Column(db.Integer); tp9 = db.Column(db.Integer); tp10 = db.Column(db.Integer)
-    tp11 = db.Column(db.Integer); tp12 = db.Column(db.Integer); tp13 = db.Column(db.Integer); tp14 = db.Column(db.Integer); tp15 = db.Column(db.Integer)
-    tp16 = db.Column(db.Integer); tp17 = db.Column(db.Integer); tp18 = db.Column(db.Integer); tp19 = db.Column(db.Integer); tp20 = db.Column(db.Integer)
-    tp21 = db.Column(db.Integer); tp22 = db.Column(db.Integer); tp23 = db.Column(db.Integer); tp24 = db.Column(db.Integer); tp25 = db.Column(db.Integer)
-    tp26 = db.Column(db.Integer); tp27 = db.Column(db.Integer); tp28 = db.Column(db.Integer); tp29 = db.Column(db.Integer); tp30 = db.Column(db.Integer)
-    tp31 = db.Column(db.Integer); tp32 = db.Column(db.Integer); tp33 = db.Column(db.Integer); tp34 = db.Column(db.Integer); tp35 = db.Column(db.Integer)
-    tp36 = db.Column(db.Integer); tp37 = db.Column(db.Integer); tp38 = db.Column(db.Integer); tp39 = db.Column(db.Integer); tp40 = db.Column(db.Integer)
-    tp41 = db.Column(db.Integer); tp42 = db.Column(db.Integer); tp43 = db.Column(db.Integer); tp44 = db.Column(db.Integer); tp45 = db.Column(db.Integer)
-    tp46 = db.Column(db.Integer); tp47 = db.Column(db.Integer); tp48 = db.Column(db.Integer); tp49 = db.Column(db.Integer); tp50 = db.Column(db.Integer)
-    tp51 = db.Column(db.Integer); tp52 = db.Column(db.Integer); tp53 = db.Column(db.Integer); tp54 = db.Column(db.Integer); tp55 = db.Column(db.Integer)
-    tp56 = db.Column(db.Integer); tp57 = db.Column(db.Integer); tp58 = db.Column(db.Integer); tp59 = db.Column(db.Integer); tp60 = db.Column(db.Integer)
-    tp61 = db.Column(db.Integer); tp62 = db.Column(db.Integer); tp63 = db.Column(db.Integer); tp64 = db.Column(db.Integer); tp65 = db.Column(db.Integer)
-    tp66 = db.Column(db.Integer); tp67 = db.Column(db.Integer); tp68 = db.Column(db.Integer); tp69 = db.Column(db.Integer); tp70 = db.Column(db.Integer)
-    tp71 = db.Column(db.Integer); tp72 = db.Column(db.Integer); tp73 = db.Column(db.Integer); tp74 = db.Column(db.Integer); tp75 = db.Column(db.Integer)
-    tp76 = db.Column(db.Integer); tp77 = db.Column(db.Integer); tp78 = db.Column(db.Integer); tp79 = db.Column(db.Integer); tp80 = db.Column(db.Integer)
-    tp81 = db.Column(db.Integer); tp82 = db.Column(db.Integer); tp83 = db.Column(db.Integer); tp84 = db.Column(db.Integer); tp85 = db.Column(db.Integer)
-    tp86 = db.Column(db.Integer); tp87 = db.Column(db.Integer); tp88 = db.Column(db.Integer); tp89 = db.Column(db.Integer); tp90 = db.Column(db.Integer)
+    tp1 = db.Column(db.Float); tp2 = db.Column(db.Float); tp3 = db.Column(db.Float); tp4 = db.Column(db.Float); tp5 = db.Column(db.Float)
+    tp6 = db.Column(db.Float); tp7 = db.Column(db.Float); tp8 = db.Column(db.Float); tp9 = db.Column(db.Float); tp10 = db.Column(db.Float)
+    tp11 = db.Column(db.Float); tp12 = db.Column(db.Float); tp13 = db.Column(db.Float); tp14 = db.Column(db.Float); tp15 = db.Column(db.Float)
+    tp16 = db.Column(db.Float); tp17 = db.Column(db.Float); tp18 = db.Column(db.Float); tp19 = db.Column(db.Float); tp20 = db.Column(db.Float)
+    tp21 = db.Column(db.Float); tp22 = db.Column(db.Float); tp23 = db.Column(db.Float); tp24 = db.Column(db.Float); tp25 = db.Column(db.Float)
+    tp26 = db.Column(db.Float); tp27 = db.Column(db.Float); tp28 = db.Column(db.Float); tp29 = db.Column(db.Float); tp30 = db.Column(db.Float)
+    tp31 = db.Column(db.Float); tp32 = db.Column(db.Float); tp33 = db.Column(db.Float); tp34 = db.Column(db.Float); tp35 = db.Column(db.Float)
+    tp36 = db.Column(db.Float); tp37 = db.Column(db.Float); tp38 = db.Column(db.Float); tp39 = db.Column(db.Float); tp40 = db.Column(db.Float)
+    tp41 = db.Column(db.Float); tp42 = db.Column(db.Float); tp43 = db.Column(db.Float); tp44 = db.Column(db.Float); tp45 = db.Column(db.Float)
+    tp46 = db.Column(db.Float); tp47 = db.Column(db.Float); tp48 = db.Column(db.Float); tp49 = db.Column(db.Float); tp50 = db.Column(db.Float)
+    tp51 = db.Column(db.Float); tp52 = db.Column(db.Float); tp53 = db.Column(db.Float); tp54 = db.Column(db.Float); tp55 = db.Column(db.Float)
+    tp56 = db.Column(db.Float); tp57 = db.Column(db.Float); tp58 = db.Column(db.Float); tp59 = db.Column(db.Float); tp60 = db.Column(db.Float)
+    tp61 = db.Column(db.Float); tp62 = db.Column(db.Float); tp63 = db.Column(db.Float); tp64 = db.Column(db.Float); tp65 = db.Column(db.Float)
+    tp66 = db.Column(db.Float); tp67 = db.Column(db.Float); tp68 = db.Column(db.Float); tp69 = db.Column(db.Float); tp70 = db.Column(db.Float)
+    tp71 = db.Column(db.Float); tp72 = db.Column(db.Float); tp73 = db.Column(db.Float); tp74 = db.Column(db.Float); tp75 = db.Column(db.Float)
+    tp76 = db.Column(db.Float); tp77 = db.Column(db.Float); tp78 = db.Column(db.Float); tp79 = db.Column(db.Float); tp80 = db.Column(db.Float)
+    tp81 = db.Column(db.Float); tp82 = db.Column(db.Float); tp83 = db.Column(db.Float); tp84 = db.Column(db.Float); tp85 = db.Column(db.Float)
+    tp86 = db.Column(db.Float); tp87 = db.Column(db.Float); tp88 = db.Column(db.Float); tp89 = db.Column(db.Float); tp90 = db.Column(db.Float)
     
 # Modelo: Log de alarmes
 class LogAlarme(db.Model):

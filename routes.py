@@ -71,15 +71,15 @@ def api_dados_atualizados():
 @bp.route("/api/termostatos")
 def api_termostatos():
     cfg = services.carregar_config()
-    ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='127.0.0.1')
-    porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=1502)
+    ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
+    porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
     
     client = ModbusTcpClient(ip, port=porta)
     if not client.connect(): 
         return jsonify({"ok": False, "erro": "sem_conexao"})
     
     try:
-        rr = client.read_holding_registers(address=1, count=90, slave=1)
+        rr = client.read_holding_registers(address=0, count=90, slave=1)
     except:
         rr = None
         
@@ -88,7 +88,7 @@ def api_termostatos():
     if rr is None or rr.isError(): 
         return jsonify({"ok": False, "erro": "erro_leitura"})
     
-    return jsonify({"ok": True, "valores": rr.registers})
+    return jsonify({"ok": True, "valores": [round(v / 10.0, 1) for v in rr.registers]})
 
 @bp.route("/api/termostatos/historico/<int:sensor_id>")
 def api_historico_sensor(sensor_id):
@@ -296,6 +296,7 @@ def criar_base():
         )
         db.session.add(nova_base)
         db.session.commit()
+        services.registrar_evento(current_app._get_current_object(), user_nome, "HELIOSTATOS", f"Cadastrou heliostato {numero_int}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Erro BD (Criar): {e}")
@@ -320,6 +321,7 @@ def atualizar_base(numero):
         base.taxa_atualizacao = int(data.get('taxa_atualizacao')) if data.get('taxa_atualizacao') else base.taxa_atualizacao
         
         db.session.commit()
+        services.registrar_evento(current_app._get_current_object(), user_nome, "HELIOSTATOS", f"Editou heliostato {numero}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Erro BD (Atualizar): {e}")
@@ -337,6 +339,7 @@ def deletar_base(numero):
     try:
         db.session.delete(base)
         db.session.commit()
+        services.registrar_evento(current_app._get_current_object(), user_nome, "HELIOSTATOS", f"Excluiu heliostato {numero}")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "erro": str(e)})

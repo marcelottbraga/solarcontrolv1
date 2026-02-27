@@ -25,6 +25,8 @@ ultimo_erro_interno = "Nenhum erro ainda"
 
 status_cameras = {1: False, 2: False}
 ultimo_alarme_registrado = {}
+alarme_temp_ativo = False
+inicio_contagem_alarme = None
 
 # Estado global de emergência (booleano)
 emergencia_acionada = False
@@ -221,78 +223,84 @@ def loop_gravacao_estacao(app):
         time.sleep(intervalo)
 
 
-# [MODIFICADO] Loop Unificado: Monitora Emergência + Grava Histórico
+#  Loop Unificado: Monitora Emergência + Grava Histórico
 def loop_termostatos_e_emergencia(app):
-    global emergencia_acionada
+    global emergencia_acionada, alarme_temp_ativo, inicio_contagem_alarme
     ultimo_historico = time.time()
     
     while True:
         with app.app_context():
             try:
                 cfg = carregar_config()
-                ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='127.0.0.1')
-                porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=1502)
-                intervalo_seg = cfg.getint('TEMPOS', 'intervalo_gravacao_termostatos_minutos', fallback=300)
-                if intervalo_seg < 5: intervalo_seg = 5 # Proteção mínima
+                ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
+                porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
                 
-                client = ModbusTcpClient(ip, port=porta)
+                client = ModbusTcpClient(ip, port=porta, timeout=2)
                 if client.connect():
-                    
-                    # 1. Verifica emergência (endereço 0)
-                    # Tenta ler como Discrete Input (FC02)
-                    rr_input = client.read_discrete_inputs(address=0, count=1)
-                    
-                    # Fallback: tenta ler como Coil (FC01) se FC02 falhar
+                    # --- 1. EMERGÊNCIA (Mantido) ---
+                    rr_input = client.read_discrete_inputs(address=0, count=1, slave=1)
                     if rr_input.isError():
-                        # print(f"[DEBUG] FC02 falhou, tentando FC01...")
-                        rr_input = client.read_coils(address=0, count=1)
-
+                        rr_input = client.read_coils(address=0, count=1, slave=1)
                     if not rr_input.isError():
-                        # Converte para booleano
                         estado_atual = bool(rr_input.bits[0])
-                        
-                        # Linha opcional de debug (descomente para testar)
-                        # print(f"[DEBUG] Botão Emergência: {estado_atual}")
-
-                        # Detecta borda de ativação/desativação
                         if estado_atual and not emergencia_acionada:
                             emergencia_acionada = True
-                            # Grava ALARME no Banco
-                            log = LogAlarme(categoria="SEGURANÇA", mensagem="EMERGÊNCIA EXTERNA ACIONADA", data_hora=datetime.now())
-                            db.session.add(log)
+                            db.session.add(LogAlarme(categoria="SEGURANÇA", mensagem="EMERGÊNCIA EXTERNA ACIONADA", data_hora=datetime.now()))
                             db.session.commit()
-                            print("\n>>> 🚨 ALARME: EMERGÊNCIA ACIONADA NO CAMPO 🚨 <<<\n")
-                        
-                        elif not estado_atual and emergencia_acionada:
+                        elif not estado_atual:
                             emergencia_acionada = False
-                            print(">>> 🟢 Emergência Normalizada <<<")
-                    else:
-                        print(f"[ERRO MODBUS] Falha ao ler botão de emergência: {rr_input}")
 
-                    # 2. Verifica se é hora de gravar histórico
-                    if (time.time() - ultimo_historico) >= intervalo_seg:
-                        rr_regs = client.read_holding_registers(address=0, count=90)
-                        if not rr_regs.isError():
-                            regs = rr_regs.registers
-                            dados_term = {f'tp{i+1}': regs[i] for i in range(len(regs))}
-                            dados_term['data_hora'] = datetime.now()
-                            
-                            # Usa a classe correta do models.py (HistoricoTermopares)
-                            h = HistoricoTermopares(**dados_term)
-                            db.session.add(h)
-                            db.session.commit()
-                            print(f"[HISTORICO] Termopares gravados com sucesso.")
-                            ultimo_historico = time.time() # Reseta o timer
+                    # --- 2. LÓGICA DE ALARME COM ESTABILIZAÇÃO (4 SEGUNDOS) ---
+                    rr_regs = client.read_holding_registers(address=0, count=90, slave=1)
                     
+                    if not rr_regs.isError():
+                        regs = rr_regs.registers
+                        dados_term = {f'tp{i+1}': round(regs[i] / 10.0, 1) for i in range(90)}
+                        
+                        t_max = cfg.getfloat('TERMOSTATOS', 'temp_max', fallback=100.0)
+                        t_min = cfg.getfloat('TERMOSTATOS', 'temp_min', fallback=0.0)
+                        t_ativa_min = cfg.getboolean('TERMOSTATOS', 'toggle_ativa_min', fallback=False)
+                        tolerancia = cfg.getint('TERMOSTATOS', 'num_sensores_alarm', fallback=6)
+
+                        criticos = sum(1 for i in range(90) if dados_term[f'tp{i+1}'] > t_max or (t_ativa_min and dados_term[f'tp{i+1}'] < t_min))
+
+                        if criticos > tolerancia:
+                            if not alarme_temp_ativo:
+                                # Se é a primeira vez que detectamos, inicia o timer de 4s
+                                if inicio_contagem_alarme is None:
+                                    inicio_contagem_alarme = time.time()
+                                    print(f"[AGUARDANDO ESTABILIZAÇÃO] Condição crítica detectada ({criticos} sensores). Aguardando 4s...")
+
+                                # Verifica se já se passaram os 4 segundos
+                                elif (time.time() - inicio_contagem_alarme) >= 4:
+                                    # O evento estabilizou: GRAVA NO BD
+                                    alarme_temp_ativo = True
+                                    inicio_contagem_alarme = None # Reseta o timer
+                                    agora = datetime.now()
+                                    dados_term['data_hora'] = agora
+                                    
+                                    db.session.add(HistoricoTermopares(**dados_term))
+                                    db.session.add(LogAlarme(
+                                        categoria="TERMOSTATOS", 
+                                        mensagem=f"ALERTA: {criticos} sensores críticos (Limite: {t_max}°C)", 
+                                        data_hora=agora
+                                    ))
+                                    db.session.commit()
+                                    print(f"[EVENTO GRAVADO] Alarme estabilizado e registrado com {criticos} sensores.")
+                        else:
+                            # Se a temperatura baixar antes dos 4s ou após o alarme ativo
+                            if alarme_temp_ativo:
+                                print("[EVENTO FINALIZADO] Temperaturas normalizadas.")
+                            
+                            alarme_temp_ativo = False
+                            inicio_contagem_alarme = None # Cancela qualquer contagem em curso
+
                     client.close()
-            
             except Exception as e:
                 print(f"Erro loop termostatos/emergencia: {e}")
-                # Pausa extra em caso de erro para não floodar o log
-                time.sleep(2)
+                db.session.rollback()
         
-        # Loop moderado (1.5s) para não engasgar o CLP se a API web também estiver acessando
-        time.sleep(1.5)
+        time.sleep(2)
 
 # Câmeras (captura de frames e reconexão)
 
@@ -339,6 +347,8 @@ def gerar_frames_camera_generico(id_camera):
 
 def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
     si = io.StringIO()
+    si.write("sep=;\n") 
+    
     writer = csv.writer(si, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
     if tipo == 'events':
