@@ -135,7 +135,6 @@ function aplicarRegrasDeUsuario() {
     console.log(`Aplicando regras para perfil: ${currentProfile}`);
     
     // --- 1. SELETORES DOS ITENS DE MENU (SIDEBAR) ---
-    // Usamos o atributo onclick para identificar cada botão do menu
     const navDashboard = document.querySelector("div[onclick=\"showScreen('dashboard')\"]");
     const navWeather   = document.querySelector("div[onclick=\"showScreen('weatherStation')\"]");
     const navSensors   = document.querySelector("div[onclick=\"showScreen('sensorTemp')\"]");
@@ -147,15 +146,15 @@ function aplicarRegrasDeUsuario() {
 
     // --- 2. SELETORES DE CONTROLES ESPECÍFICOS ---
     const botoesDashboard = document.querySelectorAll('.command-btn-main'); 
-    const formHelioCrud = document.querySelector("#helioBase .form-section"); // Área de cadastro
+    const formHelioCrud = document.querySelector("#helioBase .form-section"); 
     const radiosVentilador = document.getElementsByName('vt_controle');
     
-    // Botões de Configuração (Estação e Termostatos)
-    // Vamos tentar esconder os botões que abrem os modais, se eles tiverem IDs ou classes conhecidas.
-    // Caso contrário, a proteção será feita ao clicar (nas funções openWeatherAlarmModal etc).
+    // Novos seletores baseados nos eventos de clique
+    const btnNovoHelio = document.querySelector("button[onclick='abrirModalNovoHeliostato()']");
+    const btnSalvarTermostatos = document.querySelector("button[onclick='salvarConfiguracoesTermostatos()']");
+    const engrenagensAlarmes = document.querySelectorAll("[onclick^='openWeatherAlarmModal']");
     
     // --- 3. RESET (Habilita tudo antes de aplicar restrições) ---
-    // Exibe todos os menus
     if(navDashboard) navDashboard.style.display = 'block';
     if(navWeather)   navWeather.style.display = 'block';
     if(navSensors)   navSensors.style.display = 'block';
@@ -165,19 +164,21 @@ function aplicarRegrasDeUsuario() {
     if(navReports)   navReports.style.display = 'block';
     if(navUsers)     navUsers.style.display = 'block';
     
-    // Reabilita formulários e botões
     if(formHelioCrud) formHelioCrud.style.display = 'block';
     botoesDashboard.forEach(btn => {
         btn.disabled = false;
         btn.style.opacity = '1';
         btn.style.cursor = 'pointer';
+        btn.title = "";
     });
     radiosVentilador.forEach(r => r.disabled = false);
 
+    if(btnNovoHelio) btnNovoHelio.style.display = 'inline-block';
+    if(btnSalvarTermostatos) btnSalvarTermostatos.style.display = 'inline-block';
+    engrenagensAlarmes.forEach(el => el.style.display = 'inline-block');
 
     // --- 4. REGRAS DO VISUALIZADOR (Bloqueio Total) ---
     if (currentProfile === 'Visualizador') {
-        // ESCONDE TODOS OS MENUS exceto Dashboard
         if(navWeather)   navWeather.style.display = 'none';
         if(navSensors)   navSensors.style.display = 'none';
         if(navHelio)     navHelio.style.display = 'none';
@@ -186,7 +187,6 @@ function aplicarRegrasDeUsuario() {
         if(navReports)   navReports.style.display = 'none';
         if(navUsers)     navUsers.style.display = 'none';
 
-        // Bloqueia botões de comando do Dashboard (Visualização apenas)
         botoesDashboard.forEach(btn => {
             btn.disabled = true;
             btn.style.opacity = '0.5';
@@ -194,23 +194,27 @@ function aplicarRegrasDeUsuario() {
             btn.title = "Apenas visualização";
         });
         
-        // Se o usuário já estiver em uma tela proibida (ex: deu F5), joga pro dashboard
         showScreen('dashboard');
     }
 
     // --- 5. REGRAS DO OPERADOR (Acesso Parcial) ---
-    if (currentProfile === 'Operador') {
-        // Esconde menus de ADMIN
-        if(navSystem) navSystem.style.display = 'none'; // Config Sistema
-        if(navUsers)  navUsers.style.display = 'none';  // Usuários
+    // O Visualizador também passa por aqui para garantir ocultação de segurança extra
+    if (currentProfile === 'Operador' || currentProfile === 'Visualizador') {
+        if(navSystem) navSystem.style.display = 'none'; // Esconde menu Sistema
+        if(navUsers)  navUsers.style.display = 'none';  // Esconde menu Usuários
+        if(formHelioCrud) formHelioCrud.style.display = 'none'; // Esconde formulário de cadastro de helios
 
-        // Heliostatos: Vê a lista, mas NÃO VÊ o formulário de cadastro/edição
-        if(formHelioCrud) formHelioCrud.style.display = 'none';
-
-        // Ventilador: Não pode trocar modo (Local/Remoto)
         radiosVentilador.forEach(r => r.disabled = true);
         
-        // Nota: As configurações de Alarme e Termostatos são bloqueadas nas funções abaixo
+        // Bloqueia engrenagens de alarmes, salvamento de termostatos e botão Novo Helio
+        if(btnNovoHelio) btnNovoHelio.style.display = 'none';
+        if(btnSalvarTermostatos) btnSalvarTermostatos.style.display = 'none';
+        engrenagensAlarmes.forEach(el => el.style.display = 'none');
+    }
+
+    // Força o redesenho da tabela de heliostatos caso as permissões tenham acabado de ser atualizadas pela verificação de sessão
+    if (typeof carregarListaBases === 'function' && document.getElementById('tabelaHeliostatosBody')) {
+        carregarListaBases();
     }
 }
 
@@ -1431,7 +1435,6 @@ async function carregarListaBases() {
     if (!tbody) return;
     
     try {
-        // CORREÇÃO: Usamos fetch direto com timestamp (?t=) para driblar o cache do navegador!
         const res = await fetch('/api/bases?t=' + new Date().getTime());
         listaBasesCache = await res.json();
         
@@ -1447,6 +1450,18 @@ async function carregarListaBases() {
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid #333';
             
+            // --- Controle de Permissão Visual da Tabela ---
+            let botoesAcao = '';
+            if (currentProfile === 'Administrador') {
+                botoesAcao = `
+                    <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.8em;" title="Editar" onclick="abrirModalEditarHeliostato(${base.numero})">✏️</button>
+                    <button class="btn-danger" style="padding: 4px 10px; font-size: 0.8em; margin-left: 5px;" title="Excluir" onclick="apagarBase(${base.numero})">🗑️</button>
+                `;
+            } else {
+                botoesAcao = `<span style="color: #666; font-size: 0.85em; font-style: italic;">Somente Leitura</span>`;
+            }
+            // ----------------------------------------------
+
             tr.innerHTML = `
                 <td style="padding: 12px; font-weight: bold; color: var(--color-primary);">${base.numero}</td>
                 <td style="padding: 12px;">${base.ip || '--'}</td>
@@ -1456,8 +1471,7 @@ async function carregarListaBases() {
                 <td style="padding: 12px;">${base.phi !== null ? base.phi : '--'}</td>
                 <td style="padding: 12px;">${base.taxa_atualizacao || '--'}</td>
                 <td style="padding: 12px; text-align: center;">
-                    <button class="btn-secondary" style="padding: 4px 10px; font-size: 0.8em;" title="Editar" onclick="abrirModalEditarHeliostato(${base.numero})">✏️</button>
-                    <button class="btn-danger" style="padding: 4px 10px; font-size: 0.8em; margin-left: 5px;" title="Excluir" onclick="apagarBase(${base.numero})">🗑️</button>
+                    ${botoesAcao}
                 </td>
             `;
             tbody.appendChild(tr);
