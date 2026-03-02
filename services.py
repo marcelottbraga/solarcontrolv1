@@ -394,6 +394,18 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
                 linha.append(str(val).replace('.', ',') if val is not None else '')
             writer.writerow(linha)
 
+    elif tipo == 'heliostatos':
+        writer.writerow(['Data/Hora', 'Helio Nº', 'Status', 'Alpha (°)', 'Beta (°)', 'Theta (°)', 'Phi (°)'])
+        query = HeliostatoOperacao.query.filter(HeliostatoOperacao.data_hora.between(dt_inicio, dt_fim))
+        if filtros and 'TODOS' not in filtros:
+            num_filtros = [int(f) for f in filtros if f.isdigit()]
+            if num_filtros: query = query.filter(HeliostatoOperacao.numero.in_(num_filtros))
+            
+        registros = query.order_by(HeliostatoOperacao.data_hora.desc()).all()
+        for r in registros:
+            def fmt(val): return str(val).replace('.', ',') if val is not None else ''
+            writer.writerow([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), r.numero, r.status, fmt(r.alpha), fmt(r.beta), fmt(r.theta), fmt(r.phi)])
+
     return si.getvalue()
 
 def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
@@ -431,6 +443,20 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
                 fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
                 fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp) # <--- AQUI
             ])
+
+    elif tipo == 'heliostatos':
+        titulo = "Histórico de Operação dos Heliostatos"
+        colunas = ['Data/Hora', 'Helio', 'Status', 'Alpha', 'Beta', 'Theta', 'Phi']
+        query = HeliostatoOperacao.query.filter(HeliostatoOperacao.data_hora.between(dt_inicio, dt_fim))
+        if filtros and 'TODOS' not in filtros:
+            num_filtros = [int(f) for f in filtros if f.isdigit()]
+            if num_filtros: query = query.filter(HeliostatoOperacao.numero.in_(num_filtros))
+            
+        # Limite de 2000 linhas no PDF para evitar falta de memória RAM na hora de desenhar a tabela
+        registros = query.order_by(HeliostatoOperacao.data_hora.desc()).limit(2000).all()
+        for r in registros:
+            def fmt(val): return str(val) if val is not None else '--'
+            linhas.append([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), str(r.numero), r.status, fmt(r.alpha), fmt(r.beta), fmt(r.theta), fmt(r.phi)])
 
     # Renderiza HTML
     html_string = render_template('reports/pdf_template.html', 
@@ -583,40 +609,68 @@ def ler_dados_heliostato(heliostato_id):
     """
     Lê todos os dados vitais do heliostato via Modbus
     """
-    base = HeliostatoCadastro.query.filter_by(numero=int(heliostato_id)).first()
-    ip = base.ip if base else '127.0.0.1' 
-    porta = base.porta if base else 502
+    try:
+        # Garante que é um número inteiro válido
+        busca_num = int(heliostato_id)
+    except ValueError:
+        return {"online": False, "erro_real": "Número de heliostato inválido."}
 
-    client = ModbusTcpClient(ip, port=porta, timeout=0.5)
+    # Busca APENAS pelo 'numero' que é a sua chave primária real
+    base = HeliostatoCadastro.query.filter_by(numero=busca_num).first()
+
+    if not base:
+        return {
+            "online": False, 
+            "alpha": 0.0, "beta": 0.0, "theta": 0.0, "modo": "Desconhecido", "status": "Desconectado", "status_code": 0,
+            "erro_real": f"Heliostato {busca_num} não encontrado no banco de dados."
+        }
+
+    # Proteção caso o banco retorne IP ou porta vazios
+    ip = base.ip if base.ip else '127.0.0.1'
+    porta = base.porta if base.porta else 502
+
+    client = ModbusTcpClient(ip, port=porta, timeout=2.0)
     
     dados = {
         "online": False,
         "alpha": 0.0,
         "beta": 0.0,
         "theta": 0.0,
-        "modo": "Desconhecido", # 0=Manual, 1=Auto
-        "status": "Desconectado", # 0=Ocioso, 1=Movendo
-        "status_code": 0
+        "modo": "Desconhecido", 
+        "status": "Desconectado", 
+        "status_code": 0,
+        "erro_real": "Nenhum erro"
     }
 
     if client.connect():
         try:
-            rr = client.read_holding_registers(address=0, count=13)
+            # Lendo 13 registradores com slave=1 explícito
+            rr = client.read_holding_registers(address=0, count=13, slave=1)
             
             if not rr.isError():
                 regs = rr.registers
                 dados["online"] = True
-                dados["alpha"] = decodificar_angulo_custom(regs[0], regs[1])
-                dados["beta"] = decodificar_angulo_custom(regs[2], regs[3])
-                dados["modo"] = "Automático" if regs[10] == 1 else "Manual"
-                dados["status_code"] = regs[11]
-                dados["status"] = "Movendo" if regs[11] == 1 else "Ocioso"
-                dados["theta"] = regs[12] / 1000.0 if regs[12] > 360 else regs[12]
+                
+                # Proteção extra: só lê os índices se o simulador realmente devolveu 13 itens
+                if len(regs) >= 13:
+                    dados["alpha"] = decodificar_angulo_custom(regs[0], regs[1])
+                    dados["beta"] = decodificar_angulo_custom(regs[2], regs[3])
+                    dados["modo"] = "Automático" if regs[10] == 1 else "Manual"
+                    dados["status_code"] = regs[11]
+                    dados["status"] = "Movendo" if regs[11] == 1 else "Ocioso"
+                    dados["theta"] = regs[12] / 1000.0 if regs[12] > 360 else regs[12]
+                    dados["erro_real"] = "Sucesso"
+                else:
+                    dados["erro_real"] = f"Simulador retornou apenas {len(regs)} registradores (esperado 13)."
+            else:
+                dados["erro_real"] = f"Erro Modbus no simulador: Leitura rejeitada (isError)."
 
         except Exception as e:
-            print(f"Erro leitura Heliostato {heliostato_id}: {e}")
+            dados["erro_real"] = f"Erro interno Python: {str(e)}"
         finally:
             client.close()
+    else:
+        dados["erro_real"] = f"Falha ao conectar no IP {ip} e Porta {porta}"
             
     return dados
 

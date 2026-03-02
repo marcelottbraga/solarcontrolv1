@@ -421,6 +421,7 @@ def api_gerar_relatorio_tela():
     elif tipo == 'alarms':
         regs = LogAlarme.query.filter(LogAlarme.data_hora.between(dt_inicio, dt_fim)).order_by(LogAlarme.data_hora.desc()).all()
         for r in regs: resultado.append({"Data": r.data_hora.strftime("%d/%m/%Y %H:%M"), "Categoria": r.categoria, "Mensagem": r.mensagem})
+    
     return jsonify(resultado)
 
 @bp.route("/api/relatorios/exportar/csv", methods=["POST"])
@@ -597,6 +598,43 @@ def api_comando_heliostato(id_helio):
     res = services.enviar_comando_heliostato(id_helio, tipo, valores)
     return jsonify(res)
 
+@bp.route('/api/heliostatos/comando_lote', methods=['POST'])
+def api_comando_lote_heliostatos():
+    data = request.get_json()
+    acao = data.get('acao') # Espera receber 'HORIZ' ou 'VERT'
+    usuario = data.get('usuario', 'Sistema')
+    
+    # 1. Pega todos os equipamentos cadastrados no banco
+    bases = HeliostatoCadastro.query.all()
+    resultados = []
+    
+    for b in bases:
+        # 2. Define os ângulos baseados na ação
+        if acao == 'HORIZ':
+            valores = {'alpha': 0.0, 'beta': 0.0}
+        elif acao == 'VERT':
+            valores = {'alpha': 90.0, 'beta': 180.0}
+        else:
+            return jsonify({"ok": False, "erro": "Ação inválida."})
+            
+        # 3. Chama a função de serviço (ela já tenta conectar e falha se estiver offline)
+        res = services.enviar_comando_heliostato(b.numero, 'manual', valores)
+        
+        # 4. Guarda o resultado para sabermos quem respondeu
+        resultados.append({
+            "numero": b.numero, 
+            "sucesso": res.get("ok"), 
+            "mensagem": res.get("msg", "Comando enviado")
+        })
+        
+    # Registra a ação geral no log de eventos
+    services.registrar_evento(current_app._get_current_object(), usuario, "HELIOSTATOS_LOTE", f"Comando {acao} enviado a todos")
+        
+    return jsonify({"ok": True, "detalhes": resultados})
+    
+    
+    
+    
     # --- NOVAS ROTAS DE CONFIGURAÇÃO ---
 
 @bp.route('/api/config/salvar', methods=['POST'])
