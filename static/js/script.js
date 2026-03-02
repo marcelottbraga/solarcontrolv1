@@ -924,16 +924,70 @@ function setReportPeriod(days) {
     document.getElementById('reportEndDate').value = formatDateLocal(end);
 }
 
+async function carregarFiltrosHeliostatos() {
+    const container = document.getElementById('helioCheckboxContainer');
+    if (!container) return;
+    try {
+        const bases = await API.getBases();
+        // Recria apenas mantendo o TODOS
+        container.innerHTML = `
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="helioCheckTodos" value="TODOS" checked onchange="toggleTodosHelios(this)"> TODOS
+            </label>
+        `;
+        bases.forEach(b => {
+            container.innerHTML += `
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" class="helio-cb" value="${b.numero}" checked onchange="checkHelioIndividual()"> Helio ${b.numero}
+                </label>
+            `;
+        });
+    } catch (e) {
+        console.error("Erro ao carregar filtros de heliostatos.");
+    }
+}
+
+function toggleTodosHelios(source) {
+    document.querySelectorAll('.helio-cb').forEach(cb => cb.checked = source.checked);
+}
+
+function checkHelioIndividual() {
+    const total = document.querySelectorAll('.helio-cb').length;
+    const marcados = document.querySelectorAll('.helio-cb:checked').length;
+    document.getElementById('helioCheckTodos').checked = (total > 0 && total === marcados);
+}
+
+// Uma função auxiliar para não repetir código
+function obterFiltrosRelatorio(tipo) {
+    let filtros = [];
+    if (tipo === 'events') {
+        document.querySelectorAll('input[name="eventType"]:checked').forEach(cb => {
+            filtros.push(cb.value);
+            if (cb.value === 'LOGIN') filtros.push('LOGOUT');
+        });
+    } else if (tipo === 'heliostatos') {
+        const todos = document.getElementById('helioCheckTodos');
+        if (todos && todos.checked) {
+            filtros.push('TODOS');
+        } else {
+            document.querySelectorAll('.helio-cb:checked').forEach(cb => filtros.push(cb.value));
+        }
+    }
+    return filtros;
+}
+
 function toggleReportOptions() {
     const tipo = document.getElementById('reportType').value;
     const divEvents = document.getElementById('eventFilterOptions');
+    const divHelios = document.getElementById('helioFilterOptions'); 
+    
     divEvents.style.display = (tipo === 'events') ? 'block' : 'none';
+    if(divHelios) divHelios.style.display = (tipo === 'heliostatos') ? 'block' : 'none'; 
 
     const btnView = document.getElementById('btnVisualizarTela');
     const previewArea = document.getElementById('previewArea');
     
-    // MUDANÇA: Usa 'visibility' em vez de 'display' para segurar o espaço do botão
-    if (tipo === 'weather' || tipo === 'sensors') {
+    if (tipo === 'weather' || tipo === 'sensors'|| tipo === 'heliostatos') {
         btnView.style.visibility = 'hidden'; 
         previewArea.style.display = 'none';
     } else {
@@ -955,13 +1009,7 @@ async function buscarDadosRelatorio() {
     const fim = document.getElementById('reportEndDate').value;
     if (!inicio || !fim) { alert("Selecione o período."); return null; }
 
-    let filtrosEvento = [];
-    if (tipo === 'events') {
-        document.querySelectorAll('input[name="eventType"]:checked').forEach(cb => {
-            filtrosEvento.push(cb.value);
-            if (cb.value === 'LOGIN') filtrosEvento.push('LOGOUT');
-        });
-    }
+    let filtrosEvento = obterFiltrosRelatorio(tipo);
 
     const payload = { tipo, inicio, fim, filtros: filtrosEvento };
     return await API.gerarRelatorioTela(payload);
@@ -1002,13 +1050,7 @@ async function baixarCSV() {
     const fim = document.getElementById('reportEndDate').value;
     if (!inicio || !fim) return alert("Selecione o período.");
 
-    let filtrosEvento = [];
-    if (tipo === 'events') {
-        document.querySelectorAll('input[name="eventType"]:checked').forEach(cb => {
-            filtrosEvento.push(cb.value);
-            if (cb.value === 'LOGIN') filtrosEvento.push('LOGOUT');
-        });
-    }
+    let filtrosEvento = obterFiltrosRelatorio(tipo);
 
     const btns = document.querySelectorAll('button');
     let btn = null;
@@ -1044,13 +1086,7 @@ async function baixarPDF() {
     const fim = document.getElementById('reportEndDate').value;
     if (!inicio || !fim) return alert("Selecione o período.");
 
-    let filtrosEvento = [];
-    if (tipo === 'events') {
-        document.querySelectorAll('input[name="eventType"]:checked').forEach(cb => {
-            filtrosEvento.push(cb.value);
-            if (cb.value === 'LOGIN') filtrosEvento.push('LOGOUT');
-        });
-    }
+    let filtrosEvento = obterFiltrosRelatorio(tipo);
 
     const btn = document.getElementById('btnExportarPDF');
     let txtOriginal = "📄 Exportar PDF";
@@ -1351,6 +1387,39 @@ async function enviarComandoHelio(acao) {
         }
     } catch (e) {
         alert("Erro de comunicação");
+    }
+}
+
+// =================  (BOTOES DE COMANDO 1 E 2 - MOVER HELIOSTATOS) =================
+async function enviarComandoLote(acao) {
+    // Trava de segurança
+    if (currentProfile === 'Visualizador') {
+        return alert("Acesso Negado: Apenas visualização.");
+    }
+
+    // Texto de confirmação dependendo da ação
+    let mensagemConfirmacao = "";
+    if (acao === 'HORIZ') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição HORIZONTAL (Alpha=0, Beta=0)?";
+    if (acao === 'VERT')  mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição VERTICAL (Alpha=90, Beta=180)?";
+
+    if (!confirm(mensagemConfirmacao)) return;
+
+    try {
+        const res = await API.enviarComandoLote(acao, currentUserLogin);
+        
+        if (res.ok) {
+            // Monta um resumo de quem recebeu o comando
+            let resumo = "Resultado dos Comandos:\n\n";
+            res.detalhes.forEach(d => {
+                resumo += `Helio ${d.numero}: ${d.mensagem}\n`;
+            });
+            alert(resumo);
+        } else {
+            alert("Erro ao enviar comando: " + (res.erro || "Desconhecido"));
+        }
+    } catch (e) {
+        alert("Erro de comunicação ao tentar enviar o comando em lote.");
+        console.error(e);
     }
 }
 
@@ -2313,6 +2382,7 @@ document.addEventListener('DOMContentLoaded', () => {
     generateHeatmap();
     gerarGridHeliostatos(); 
     carregarDadosReplay();
+    carregarFiltrosHeliostatos();
     
     // 4. Busca dados iniciais
     atualizarDados();

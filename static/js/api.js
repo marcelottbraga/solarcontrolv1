@@ -135,6 +135,19 @@ const API = {
         return await resp.json();
     },
 
+    enviarComandoLote: async (acao, usuario) => {
+        try {
+            const resp = await fetch('/api/heliostatos/comando_lote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ acao: acao, usuario: usuario })
+            });
+            return await resp.json();
+        } catch (e) {
+            return { ok: false, erro: "Erro de rede" };
+        }
+    },
+    
     // --- RELATÓRIOS ---
     gerarRelatorioTela: async (payload) => {
         const res = await fetch('/api/relatorios/gerar', {
