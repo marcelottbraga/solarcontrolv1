@@ -16,7 +16,7 @@ const weatherMeta = {
     'ghi1': { label: 'GHI 1 (Global)', unit: ' W/m²' },
     'bni': { label: 'BNI (Direta)', unit: ' W/m²' },
     'dhi': { label: 'DHI (Difusa)', unit: ' W/m²' },
-    'cell_irrad': { label: 'Cell_Irrad', unit: ' W/m²' }, // <--- Antigo ghi2 alterado aqui
+    'cell_irrad': { label: 'Cell_Irrad', unit: ' W/m²' }, 
     'old': { label: 'OLD (Onda Longa Emit.)', unit: ' W/m²' },
     'lwd': { label: 'LWD (Onda Longa Desc.)', unit: ' W/m²' },
     'vento_dir': { label: 'Dir. Vento', unit: '°' },
@@ -26,7 +26,7 @@ const weatherMeta = {
     'umidade_rel': { label: 'Umidade Rel.', unit: ' %' },
     'pressao_atm': { label: 'Pressão Atm.', unit: ' mbar' },
     'v_bat': { label: 'Bateria', unit: ' V' },
-    'cell_temp': { label: 'Cell_Temp (Célula)', unit: ' °C' } // <--- Novo sensor adicionado aqui
+    'cell_temp': { label: 'Cell_Temp (Célula)', unit: ' °C' } 
 };
 
 
@@ -35,18 +35,42 @@ const weatherMeta = {
 let currentAlarmKey = null;
 
 
+
 // --- CONFIGURAÇÃO DE PRIORIDADE DE ALARMES ---
 const PRIORIDADE_ALARMES = [
-    "Termostatos Críticos",          
-    "Velocidade do Vento Alta",      
-    "DNI Alto",
-    "GHI Alto",
-    "Taxa de Chuva Alta",
-    "Precipitação Acumulada Alta",
-    "DNI Baixo",
-    "GHI Baixo",
-    "Direção do Vento Baixo",
-    "Direção do Vento Alto"
+    "EMERGÊNCIA EXTERNA!",           // 0: Risco Máximo (Parada obrigatória)
+    "Termostatos Críticos",          // 1: Risco no Foco (Pode derreter o alvo)
+    
+    // --- RISCOS FÍSICOS AO SISTEMA ---
+    "Vel. Vento Alto",               // 2: Risco estrutural para os heliostatos
+    "Bateria Baixo",                 // 3: Risco de apagão do controle
+    "Bateria Alto",                  
+    "Cell_Temp (Célula) Alto",       // 4: Superaquecimento de equipamento
+    
+    // --- LIMITES OPERACIONAIS METEOROLÓGICOS ---
+    "Chuva Acum. Alto",
+    "Temp. Ar Alto",
+    "Temp. Ar Baixo",
+    "GHI 1 (Global) Alto",
+    "GHI 1 (Global) Baixo",
+    "BNI (Direta) Alto",
+    "BNI (Direta) Baixo",
+    "DHI (Difusa) Alto",
+    "DHI (Difusa) Baixo",
+    "Cell_Irrad Alto",
+    "Cell_Irrad Baixo",
+    
+    // --- OUTROS PARÂMETROS ---
+    "Dir. Vento Alto",
+    "Dir. Vento Baixo",
+    "Umidade Rel. Alto",
+    "Umidade Rel. Baixo",
+    "Pressão Atm. Alto",
+    "Pressão Atm. Baixo",
+    "OLD (Onda Longa Emit.) Alto",
+    "OLD (Onda Longa Emit.) Baixo",
+    "LWD (Onda Longa Desc.) Alto",
+    "LWD (Onda Longa Desc.) Baixo"
 ];
 
 let sensorConfig = { min: 20, max: 600, tolerance: 5, alarmBelowMin: false };
@@ -89,6 +113,7 @@ function hideLoading() {
 }
 
 // Função para restaurar o nível do usuário ao recarregar a página
+// Função para restaurar o nível do usuário ao recarregar a página
 async function verificarSessao() {
     try {
         const resp = await fetch('/api/sessao');
@@ -98,6 +123,26 @@ async function verificarSessao() {
             // Restaura o perfil correto (Admin/Operador/Visualizador)
             currentProfile = data.perfil; 
             console.log("Sessão restaurada. Nível:", currentProfile);
+
+            // SE O USUÁRIO ESTIVER LOGADO (Não for visitante)
+            if (data.nome !== 'Visitante') {
+                // 1. Restaura as variáveis globais
+                currentUser = data.nome;
+                currentUserLogin = data.usuario;
+
+                // 2. Esconde a tela de Login e mostra o App
+                const loginScreen = document.getElementById('loginScreen');
+                const appScreen = document.getElementById('appScreen');
+                if (loginScreen) loginScreen.classList.remove('active');
+                if (appScreen) appScreen.classList.add('active');
+
+                // 3. Atualiza o nome do usuário no topo da tela
+                const elUser = document.getElementById('currentUser');
+                if (elUser) elUser.textContent = `👤 ${data.nome} (${data.perfil})`;
+
+                // 4. Vai direto para o Dashboard
+                showScreen('dashboard');
+            }
 
             // Atualiza a interface (Botão Sair)
             const loginBtn = document.getElementById('loginBtn');
@@ -114,6 +159,7 @@ async function verificarSessao() {
         console.error("Erro ao verificar sessão", e);
     }
 }
+
 // ================= LOGIN E NAVEGAÇÃO =================
 async function handleLogin(event) {
     event.preventDefault();
@@ -758,8 +804,16 @@ function verificarAlarmesTemperatura(valores) {
         }
     });
 
-    // Reseta o array de alarmes de termostatos
+    // 1. GUARDA O ESTADO DA EMERGÊNCIA ANTES DE LIMPAR O ARRAY
+    const temEmergencia = alarmesGlobais.termostatos.includes("EMERGÊNCIA EXTERNA!");
+
+    // 2. Reseta o array de alarmes de termostatos
     alarmesGlobais.termostatos = [];
+
+    // 3. REINSERE A EMERGÊNCIA SE ELA ESTAVA ATIVA
+    if (temEmergencia) {
+        alarmesGlobais.termostatos.push("EMERGÊNCIA EXTERNA!");
+    }
 
     // DISPARO DO ALARME: Se a quantidade de sensores em erro for MAIOR que a tolerância
     // Ex: Se tolerância é 6, precisa de 7 sensores para disparar.
@@ -768,6 +822,7 @@ function verificarAlarmesTemperatura(valores) {
         console.warn(`[ALARME] ${sensoresCriticos} sensores críticos detectados (Limite: ${sensorConfig.tolerance})`);
     }
 
+    // Chama a interface. Como agora o array não "pisca" mais, a sirene ficará armada continuamente!
     atualizarInterfaceAlarmes();
 }
 
@@ -985,7 +1040,8 @@ function obterFiltrosRelatorio(tipo) {
     if (tipo === 'events') {
         document.querySelectorAll('input[name="eventType"]:checked').forEach(cb => {
             filtros.push(cb.value);
-            if (cb.value === 'LOGIN') filtros.push('LOGOUT');
+            // Mantém a regra do Logout casada com o Login
+            if (cb.value === 'LOGIN') filtros.push('LOGOUT'); 
         });
     } else if (tipo === 'heliostatos') {
         const todos = document.getElementById('helioCheckTodos');
@@ -1376,13 +1432,14 @@ async function enviarComandoHelio(acao) {
         const beta = document.getElementById('inputBeta').value;
         if (!alpha || !beta) return alert("Preencha Alpha e Beta");
         
-        payload = { tipo: 'manual', valores: { alpha: alpha, beta: beta } };
+        // NOVO: Adicionado "usuario: currentUser"
+        payload = { tipo: 'manual', valores: { alpha: alpha, beta: beta }, usuario: currentUser };
     } else if (acao === 'auto') {
-        payload = { tipo: 'modo', valores: { modo: 1 } };
+        payload = { tipo: 'modo', valores: { modo: 1 }, usuario: currentUser };
     } else if (acao === 'stop') {
-        payload = { tipo: 'modo', valores: { modo: 0 } };
+        payload = { tipo: 'modo', valores: { modo: 0 }, usuario: currentUser };
     } else if (acao === 'salvar_vetor') {
-        payload = { tipo: 'salvar_vetor', valores: {} };
+        payload = { tipo: 'salvar_vetor', valores: {}, usuario: currentUser };
     }
     
     // --- MOSTRA O LOADING ---
@@ -1417,8 +1474,8 @@ async function enviarComandoLote(acao) {
     }
 
     let mensagemConfirmacao = "";
-    if (acao === 'HORIZ') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição HORIZONTAL (Alpha=0, Beta=0)?";
-    if (acao === 'VERT')  mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição VERTICAL (Alpha=90, Beta=180)?";
+    if (acao === 'HORIZ') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição HORIZONTAL?";
+    if (acao === 'VERT')  mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição VERTICAL?";
 
     if (!confirm(mensagemConfirmacao)) return;
 
@@ -2435,7 +2492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const loopHeatmap = async () => { await generateHeatmap(); setTimeout(loopHeatmap, 5000); };
     const loopDados = async () => { await atualizarDados(); setTimeout(loopDados, 2000); };
-    const loopConexao = async () => { await atualizarStatusConexao(); setTimeout(loopConexao, 5000); };
+    const loopConexao = async () => { await atualizarStatusConexao(); setTimeout(loopConexao, 1000); };
     const loopHeliostatos = async () => { await gerarGridHeliostatos(); setTimeout(loopHeliostatos, 2000); };
     const loopCameras = async () => { await atualizarStatusCamerasUI(); setTimeout(loopCameras, 2000); };
 

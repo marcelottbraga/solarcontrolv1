@@ -238,9 +238,10 @@ def loop_gravacao_estacao(app):
 
 
 #  Loop Unificado: Monitora Emergência + Grava Histórico
+#  Loop Unificado: Monitora Emergência + Grava Histórico
 def loop_termostatos_e_emergencia(app):
     global emergencia_acionada, alarme_temp_ativo, inicio_contagem_alarme
-    ultimo_historico = time.time()
+    ultimo_historico = 0  # <--- Inicializa em 0 para garantir a primeira gravação imediata
     
     while True:
         with app.app_context():
@@ -248,6 +249,11 @@ def loop_termostatos_e_emergencia(app):
                 cfg = carregar_config()
                 ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
                 porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
+                
+                # Busca o intervalo de gravação no arquivo de configuração (padrão 30s)
+                intervalo_gravacao = cfg.getint('TEMPOS', 'intervalo_gravacao_termostatos_segundos', fallback=30)
+                if intervalo_gravacao < 1: 
+                    intervalo_gravacao = 30
                 
                 client = ModbusTcpClient(ip, port=porta, timeout=1)
                 if client.connect():
@@ -264,16 +270,35 @@ def loop_termostatos_e_emergencia(app):
                         elif not estado_atual:
                             emergencia_acionada = False
 
-                    # --- 2. LÓGICA DE ALARME COM ESTABILIZAÇÃO (4 SEGUNDOS) ---
+                    # --- 2. LÓGICA DE ALARME E GRAVAÇÃO DE HISTÓRICO ---
                     rr_regs = client.read_holding_registers(address=0, count=90, slave=1)
                     
                     if not rr_regs.isError():
                         regs = rr_regs.registers
                         dados_term = {f'tp{i+1}': round(regs[i] / 10.0, 1) for i in range(90)}
                         
-                        # --- NOVO: SALVA NO CACHE PARA O HEATMAP (FRONTEND) LER RÁPIDO ---
+                        # Salva no cache para o frontend ler rápido
                         CACHE_MEMORIA['termostatos_valores'] = [round(v / 10.0, 1) for v in regs]
                         
+                        agora_ts = time.time()
+                        agora_dt = datetime.now()
+
+                        # ==========================================
+                        # NOVO: GRAVAÇÃO PERIÓDICA NO BANCO DE DADOS
+                        # ==========================================
+                        if (agora_ts - ultimo_historico) >= intervalo_gravacao:
+                            # Cria uma cópia do dicionário para adicionar a data/hora sem sujar a original
+                            dados_hist = dados_term.copy()
+                            dados_hist['data_hora'] = agora_dt
+                            
+                            db.session.add(HistoricoTermopares(**dados_hist))
+                            db.session.commit()
+                            ultimo_historico = agora_ts
+                            print(f"[HISTORICO] Termostatos gravados no BD (Intervalo: {intervalo_gravacao}s)")
+
+                        # ==========================================
+                        # LÓGICA DE ALARME COM ESTABILIZAÇÃO (4s)
+                        # ==========================================
                         t_max = cfg.getfloat('TERMOSTATOS', 'temp_max', fallback=100.0)
                         t_min = cfg.getfloat('TERMOSTATOS', 'temp_min', fallback=0.0)
                         t_ativa_min = cfg.getboolean('TERMOSTATOS', 'toggle_ativa_min', fallback=False)
@@ -283,41 +308,38 @@ def loop_termostatos_e_emergencia(app):
 
                         if criticos > tolerancia:
                             if not alarme_temp_ativo:
-                                # Se é a primeira vez que detectamos, inicia o timer de 4s
                                 if inicio_contagem_alarme is None:
-                                    inicio_contagem_alarme = time.time()
+                                    inicio_contagem_alarme = agora_ts
                                     print(f"[AGUARDANDO ESTABILIZAÇÃO] Condição crítica detectada ({criticos} sensores). Aguardando 4s...")
 
-                                # Verifica se já se passaram os 4 segundos
-                                elif (time.time() - inicio_contagem_alarme) >= 4:
-                                    # O evento estabilizou: GRAVA NO BD
+                                elif (agora_ts - inicio_contagem_alarme) >= 4:
                                     alarme_temp_ativo = True
-                                    inicio_contagem_alarme = None # Reseta o timer
-                                    agora = datetime.now()
-                                    dados_term['data_hora'] = agora
+                                    inicio_contagem_alarme = None 
                                     
-                                    db.session.add(HistoricoTermopares(**dados_term))
+                                    # Grava o histórico também no momento do alarme crítico para garantir a foto exata do momento
+                                    dados_alarme = dados_term.copy()
+                                    dados_alarme['data_hora'] = agora_dt
+                                    db.session.add(HistoricoTermopares(**dados_alarme))
+                                    
                                     db.session.add(LogAlarme(
                                         categoria="TERMOSTATOS", 
                                         mensagem=f"ALERTA: {criticos} sensores críticos (Limite: {t_max}°C)", 
-                                        data_hora=agora
+                                        data_hora=agora_dt
                                     ))
                                     db.session.commit()
                                     print(f"[EVENTO GRAVADO] Alarme estabilizado e registrado com {criticos} sensores.")
                         else:
-                            # Se a temperatura baixar antes dos 4s ou após o alarme ativo
                             if alarme_temp_ativo:
                                 print("[EVENTO FINALIZADO] Temperaturas normalizadas.")
-                            
                             alarme_temp_ativo = False
-                            inicio_contagem_alarme = None # Cancela qualquer contagem em curso
+                            inicio_contagem_alarme = None
 
                     client.close()
             except Exception as e:
                 print(f"Erro loop termostatos/emergencia: {e}")
                 db.session.rollback()
         
-        time.sleep(2)
+        time.sleep(1)
 
 # Câmeras (captura de frames e reconexão)
 

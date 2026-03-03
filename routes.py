@@ -29,18 +29,24 @@ def login():
         session['usuario_id'] = user.id
         session['nome'] = user.nome
         session['perfil'] = user.perfil
-        
+        session['usuario'] = user.usuario
+
         services.registrar_evento(current_app._get_current_object(), user.nome, "LOGIN", "Login realizado")
         return jsonify({"ok": True, "nome": user.nome, "perfil": user.perfil})
     
     return jsonify({"ok": False, "erro": "Credenciais inválidas"})
 
 # API: logout
+# API: logout
 @bp.route('/api/logout', methods=['POST'])
 def logout():
     data = request.get_json()
     usuario = data.get('usuario', 'Desconhecido')
     services.registrar_evento(current_app._get_current_object(), usuario, "LOGOUT", "Logout realizado")
+    
+    # <--- NOVO: Apaga a memória da sessão no servidor --->
+    session.clear() 
+    
     return jsonify({"ok": True})
 
 # APIs de dados
@@ -553,7 +559,15 @@ def api_comando_heliostato(id_helio):
     data = request.get_json()
     tipo = data.get('tipo')
     valores = data.get('valores')
+    usuario = data.get('usuario', 'Sistema') # <--- NOVO: Recebe o utilizador
+    
     res = services.enviar_comando_heliostato(id_helio, tipo, valores)
+    
+    # <--- NOVO: REGISTRA NO LOG DE EVENTOS SE O COMANDO FOI ENVIADO --->
+    if res.get("ok"):
+        detalhes = f"Comando '{tipo}' enviado ao Helio {id_helio}. Valores: {valores}"
+        services.registrar_evento(current_app._get_current_object(), usuario, "COMANDO", detalhes)
+        
     return jsonify(res)
 
 @bp.route('/api/heliostatos/comando_lote', methods=['POST'])
@@ -569,7 +583,7 @@ def api_comando_lote_heliostatos():
     for b in bases:
         # 2. Define os ângulos baseados na ação
         if acao == 'HORIZ':
-            valores = {'alpha': 0.0, 'beta': 0.0}
+            valores = {'alpha': 11.0, 'beta': 0.0}
         elif acao == 'VERT':
             valores = {'alpha': 90.0, 'beta': 180.0}
         else:
@@ -586,7 +600,7 @@ def api_comando_lote_heliostatos():
         })
         
     # Registra a ação geral no log de eventos
-    services.registrar_evento(current_app._get_current_object(), usuario, "HELIOSTATOS_LOTE", f"Comando {acao} enviado a todos")
+    services.registrar_evento(current_app._get_current_object(), usuario, "COMANDO", f"Enviou comando em lote ({acao}) para todos os heliostatos")
         
     return jsonify({"ok": True, "detalhes": resultados})
     
@@ -650,7 +664,8 @@ def api_sessao():
     return jsonify({
         'ok': True,
         'nome': session.get('nome', 'Visitante'),
-        'perfil': session.get('perfil', 'Visualizador') # Se cair a sessão, vira Visualizador
+        'perfil': session.get('perfil', 'Visualizador'), # Se cair a sessão, vira Visualizador
+        'usuario': session.get('usuario', 'visitante') # <--- NOVO
     })
 
 # --- ROTA DE DEBUG (Adicione no final do routes.py) ---
