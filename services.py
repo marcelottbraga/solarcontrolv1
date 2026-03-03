@@ -31,6 +31,20 @@ inicio_contagem_alarme = None
 # Estado global de emergência (booleano)
 emergencia_acionada = False
 
+#  --- CACHE EM MEMÓRIA ---
+CACHE_MEMORIA = {
+    'estacao_dados': None,
+    'termostatos_valores': None,
+    'status_geral': {
+        'estacao_online': False, 
+        'termostatos_online': False,
+        'wifi_online': False,
+        'ventilador_online': False,
+        'emergencia': False
+    },
+    'heliostatos': {}
+}
+
 # Configuração e utilitários
 
 def carregar_config():
@@ -78,7 +92,7 @@ def ler_dados_estacao():
     porta = config.getint('SISTEMA', 'port_estacao_meteo', fallback=502)
     slave_id = 1  # Conforme planilha
     
-    client = ModbusTcpClient(ip, port=porta)
+    client = ModbusTcpClient(ip, port=porta, timeout=1)
     dados = {}
     
     if client.connect():
@@ -235,7 +249,7 @@ def loop_termostatos_e_emergencia(app):
                 ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
                 porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
                 
-                client = ModbusTcpClient(ip, port=porta, timeout=2)
+                client = ModbusTcpClient(ip, port=porta, timeout=1)
                 if client.connect():
                     # --- 1. EMERGÊNCIA (Mantido) ---
                     rr_input = client.read_discrete_inputs(address=0, count=1, slave=1)
@@ -256,6 +270,9 @@ def loop_termostatos_e_emergencia(app):
                     if not rr_regs.isError():
                         regs = rr_regs.registers
                         dados_term = {f'tp{i+1}': round(regs[i] / 10.0, 1) for i in range(90)}
+                        
+                        # --- NOVO: SALVA NO CACHE PARA O HEATMAP (FRONTEND) LER RÁPIDO ---
+                        CACHE_MEMORIA['termostatos_valores'] = [round(v / 10.0, 1) for v in regs]
                         
                         t_max = cfg.getfloat('TERMOSTATOS', 'temp_max', fallback=100.0)
                         t_min = cfg.getfloat('TERMOSTATOS', 'temp_min', fallback=0.0)
@@ -481,7 +498,7 @@ def ler_dados_ventilador():
     ip = config.get('SISTEMA', 'ip_ventilador', fallback='127.0.0.1')
     porta = config.getint('SISTEMA', 'port_ventilador', fallback=502)
     
-    client = ModbusTcpClient(ip, port=porta)
+    client = ModbusTcpClient(ip, port=porta, timeout=1)
     
     dados = {
         "online": False,
@@ -543,7 +560,7 @@ def escrever_comando_ventilador(tipo, valor):
     ip = config.get('SISTEMA', 'ip_ventilador', fallback='127.0.0.1')
     porta = config.getint('SISTEMA', 'port_ventilador', fallback=502)
     
-    client = ModbusTcpClient(ip, port=porta)
+    client = ModbusTcpClient(ip, port=porta, timeout=1)
     sucesso = False
 
     if client.connect():
@@ -629,7 +646,7 @@ def ler_dados_heliostato(heliostato_id):
     ip = base.ip if base.ip else '127.0.0.1'
     porta = base.porta if base.porta else 502
 
-    client = ModbusTcpClient(ip, port=porta, timeout=2.0)
+    client = ModbusTcpClient(ip, port=porta, timeout=1.0)
     
     dados = {
         "online": False,
@@ -749,10 +766,14 @@ def loop_gravacao_heliostatos(app):
                     
                     ultimo_tempo = ultimas_gravacoes.get(num, 0)
                     
-                    # Chegou a hora de gravar para este heliostato específico?
+                   # Chegou a hora de gravar para este heliostato específico?
                     if (agora - ultimo_tempo) >= taxa_segundos:
                         dados = ler_dados_heliostato(num)
                         
+                        # --- NOVO: SALVA NO CACHE IMEDIATAMENTE PARA O FLASK LER ---
+                        if dados:
+                            CACHE_MEMORIA['heliostatos'][num] = dados
+                            
                         # Só grava no histórico se a comunicação Modbus funcionou (online = True)
                         if dados and dados.get('online'):
                             nova_operacao = HeliostatoOperacao(
@@ -777,3 +798,56 @@ def loop_gravacao_heliostatos(app):
         # Pausa curta para não monopolizar o processador
         time.sleep(0.5)
         
+def loop_monitoramento_rapido(app):
+    """Worker rápido para manter os dados em memória RAM e evitar lentidão na UI."""
+    global CACHE_MEMORIA, emergencia_acionada
+    
+    while True:
+        with app.app_context():
+            try:
+                cfg = carregar_config()
+                
+                # 1. ESTAÇÃO METEOROLÓGICA (Apenas leitura para RAM)
+                dados_est = ler_dados_estacao()
+                if dados_est:
+                    CACHE_MEMORIA['estacao_dados'] = dados_est
+                    CACHE_MEMORIA['status_geral']['estacao_online'] = True
+                else:
+                    CACHE_MEMORIA['status_geral']['estacao_online'] = False
+                    
+                # 2. TERMOSTATOS (Ping rápido)
+                ip_term = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
+                port_term = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
+                c_term = ModbusTcpClient(ip_term, port=port_term, timeout=1)
+                CACHE_MEMORIA['status_geral']['termostatos_online'] = c_term.connect()
+                c_term.close()
+                
+                # 3. WIFI (Ping rápido via Socket)
+                ip_rot = cfg.get('SISTEMA', 'ip_roteador', fallback='192.168.5.12')
+                port_rot = cfg.getint('SISTEMA', 'port_roteador', fallback=6065)
+                wifi_ok = False
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5)
+                    if s.connect_ex((ip_rot, port_rot)) == 0:
+                        wifi_ok = True
+                    s.close()
+                except:
+                    pass
+                CACHE_MEMORIA['status_geral']['wifi_online'] = wifi_ok
+                
+                # 4. VENTILADOR (Ping rápido)
+                ip_vent = cfg.get('SISTEMA', 'ip_ventilador', fallback='192.168.1.55')
+                port_vent = cfg.getint('SISTEMA', 'port_ventilador', fallback=502)
+                c_vent = ModbusTcpClient(ip_vent, port=port_vent, timeout=1)
+                CACHE_MEMORIA['status_geral']['ventilador_online'] = c_vent.connect()
+                c_vent.close()
+                
+                # 5. EMERGÊNCIA (Cópia do estado global)
+                CACHE_MEMORIA['status_geral']['emergencia'] = emergencia_acionada
+
+            except Exception as e:
+                print(f"Erro no loop de monitoramento rápido: {e}")
+
+        # Aguarda 2 segundos antes de varrer tudo novamente
+        time.sleep(2)

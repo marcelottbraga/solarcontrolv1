@@ -47,48 +47,30 @@ def logout():
 
 @bp.route('/api/dados')
 def api_dados_atualizados():
-    # Opção 1: Tenta ler fresco agora mesmo
-    # Isso garante que o dado na tela é o real instantâneo
-    dados_frescos = services.ler_dados_estacao()
+    # Lemos instantaneamente da memória RAM
+    dados_frescos = services.CACHE_MEMORIA.get('estacao_dados')
     
     if dados_frescos:
-        dados_frescos['ok'] = True
-        return jsonify(dados_frescos)
+        # Copiamos para não alterar o original em memória
+        resposta = dict(dados_frescos)
+        resposta['ok'] = True
+        return jsonify(resposta)
     
-    # Opção 2: Se a leitura falhar (ocupado/timeout), pega o último cache da memória
-    # (Ainda é melhor que ler do banco de dados)
-    cache = services.ler_dados_estacao()
-    
-    if cache:
-        return jsonify(cache)
-        
-    # Opção 3: Se tudo falhar
+    # Se o cache ainda estiver vazio (nos primeiros 2 segundos ao ligar o servidor) ou a rede em baixo
     return jsonify({
         "ok": False, 
-        "erro": f"Leitura falhou. Motivo: {services.ultimo_erro_interno}"
+        "erro": f"Aguardando leitura do equipamento ou offline."
     })
 
 @bp.route("/api/termostatos")
 def api_termostatos():
-    cfg = services.carregar_config()
-    ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
-    porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
+    # Lemos instantaneamente da memória RAM
+    valores = services.CACHE_MEMORIA.get('termostatos_valores')
     
-    client = ModbusTcpClient(ip, port=porta)
-    if not client.connect(): 
-        return jsonify({"ok": False, "erro": "sem_conexao"})
-    
-    try:
-        rr = client.read_holding_registers(address=0, count=90, slave=1)
-    except:
-        rr = None
+    if valores:
+        return jsonify({"ok": True, "valores": valores})
         
-    client.close()
-    
-    if rr is None or rr.isError(): 
-        return jsonify({"ok": False, "erro": "erro_leitura"})
-    
-    return jsonify({"ok": True, "valores": [round(v / 10.0, 1) for v in rr.registers]})
+    return jsonify({"ok": False, "erro": "Aguardando leitura dos termostatos..."})
 
 @bp.route("/api/termostatos/historico/<int:sensor_id>")
 def api_historico_sensor(sensor_id):
@@ -107,47 +89,15 @@ def api_historico_sensor(sensor_id):
 
 @bp.route("/api/status")
 def api_status():
-    cfg = services.carregar_config()
+    status = services.CACHE_MEMORIA.get('status_geral', {})
     
-    # 1. Checa Estação
-    c1 = ModbusTcpClient(cfg.get('SISTEMA', 'ip_estacao_meteo'), port=cfg.getint('SISTEMA', 'port_estacao_meteo'))
-    est_ok = c1.connect()
-    c1.close()
-    
-    # 2. Checa Termostatos/CLP
-    c2 = ModbusTcpClient(cfg.get('SISTEMA', 'ip_termostatos'), port=cfg.getint('SISTEMA', 'port_termostatos'))
-    term_ok = c2.connect()
-    c2.close()
-
-    # 3. Checa Roteador WiFi
-    ip_rot = cfg.get('SISTEMA', 'ip_roteador', fallback='192.168.5.12')
-    port_rot = cfg.getint('SISTEMA', 'port_roteador', fallback=6065)
-    wifi_ok = False
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.5)
-        if s.connect_ex((ip_rot, port_rot)) == 0:
-            wifi_ok = True
-        s.close()
-    except:
-        wifi_ok = False
-
-    # 4. Checa ventilador (Modbus)
-    ip_vent = cfg.get('SISTEMA', 'ip_ventilador', fallback='192.168.1.55')
-    port_vent = cfg.getint('SISTEMA', 'port_ventilador', fallback=502)
-    
-    c_vent = ModbusTcpClient(ip_vent, port=port_vent)
-    vent_ok = c_vent.connect()
-    c_vent.close()
-    # ------------------------------------------
-
     return jsonify({
         "ok": True, 
-        "estacao_online": est_ok, 
-        "termostatos_online": term_ok,
-        "wifi_online": wifi_ok,
-        "ventilador_online": vent_ok, # Estado do ventilador
-        "emergencia": services.emergencia_acionada
+        "estacao_online": status.get('estacao_online', False), 
+        "termostatos_online": status.get('termostatos_online', False),
+        "wifi_online": status.get('wifi_online', False),
+        "ventilador_online": status.get('ventilador_online', False),
+        "emergencia": status.get('emergencia', False)
     })
     
 @bp.route("/api/status/cameras")
@@ -227,7 +177,7 @@ def api_alarme_sirene():
     data = request.get_json()
     ligar = data.get("ativo", False)
     
-    client = ModbusTcpClient(ip, port=porta)
+    client = ModbusTcpClient(ip, port=porta, timeout=1)
     if client.connect():
         try:
             client.write_coil(address=0, value=ligar)
@@ -561,34 +511,42 @@ def api_post_ventilador():
 
 @bp.route('/api/heliostatos/status_geral', methods=['GET'])
 def api_status_heliostatos():
-    """Retorna status resumido COM LEITURA REAL para pintar o grid corretamente"""
+    """Retorna status resumido INSTANTÂNEO lendo da memória RAM"""
     bases = HeliostatoCadastro.query.all()
     lista = {}
     
     for b in bases:
-        try:
-            num = b.numero
-            dados_reais = services.ler_dados_heliostato(num)
-            
-            lista[num] = {
-                "configurado": True,
-                "ip": b.ip,
-                "posicao": b.posicao,
-                "online": dados_reais['online'],         
-                "status_code": dados_reais['status_code'], 
-                "status": dados_reais['status']          
-            }
-        except Exception as e:
-            print(f"Erro ao processar base {b.numero}: {e}")
-            pass
+        num = b.numero
+        # Pega do cache (se não existir ainda, usa um estado offline padrão)
+        dados_reais = services.CACHE_MEMORIA.get('heliostatos', {}).get(num, {
+            "online": False,
+            "status_code": 0,
+            "status": "Aguardando leitura..."
+        })
+        
+        lista[num] = {
+            "configurado": True,
+            "ip": b.ip,
+            "posicao": b.posicao,
+            "online": dados_reais.get('online', False),         
+            "status_code": dados_reais.get('status_code', 0), 
+            "status": dados_reais.get('status', 'Desconhecido')          
+        }
             
     return jsonify(lista)
 
 @bp.route('/api/heliostato/<id_helio>', methods=['GET'])
 def api_detalhe_heliostato(id_helio):
-    """Lê Modbus para o Popup"""
-    dados = services.ler_dados_heliostato(id_helio)
-    return jsonify(dados)
+    """Lê da memória RAM para o Popup abrir instantaneamente"""
+    try:
+        num = int(id_helio)
+        dados = services.CACHE_MEMORIA.get('heliostatos', {}).get(num)
+        if dados:
+            return jsonify(dados)
+        else:
+            return jsonify({"online": False, "erro_real": "Aguardando primeira leitura do sistema..."})
+    except:
+        return jsonify({"online": False, "erro_real": "ID Inválido"})
 
 @bp.route('/api/heliostato/<id_helio>/comando', methods=['POST'])
 def api_comando_heliostato(id_helio):
