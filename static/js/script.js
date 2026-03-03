@@ -73,6 +73,21 @@ const weatherMap = {
     'Temperatura': 'temperatura', 'Umidade': 'umidade', 'Pressão': 'pressao'
 };
 
+// ================= FUNÇÕES DE LOADING =================
+function showLoading(msg = "Aguarde...") {
+    const overlay = document.getElementById('globalLoadingOverlay');
+    const msgEl = document.getElementById('loadingMessage');
+    if (overlay && msgEl) {
+        msgEl.textContent = msg;
+        overlay.classList.add('active');
+    }
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('globalLoadingOverlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
 // Função para restaurar o nível do usuário ao recarregar a página
 async function verificarSessao() {
     try {
@@ -107,6 +122,8 @@ async function handleLogin(event) {
     
     if (!userField || !passField) return alert("Preencha usuário e senha.");
 
+    showLoading("Autenticando...");
+
     try {
         const result = await API.login(userField, passField);
         if (result.ok) {
@@ -128,6 +145,10 @@ async function handleLogin(event) {
         }
     } catch (error) {
         alert("Erro de conexão.");
+    }
+    finally {
+        // --- ESCONDE O LOADING SEMPRE ---
+        hideLoading();
     }
 }
 
@@ -596,21 +617,14 @@ async function salvarIPs() {
     const tEstacao = document.getElementById('tempo_gravacao_estacao').value;
     const tTerm = document.getElementById('tempo_gravacao_termostatos').value;
 
-    // Validação básica
     if (!tEstacao || tEstacao <= 0) return alert("Tempo da Estação inválido.");
     if (!tTerm || tTerm <= 0) return alert("Tempo dos Termostatos inválido.");
 
-    // Função auxiliar para pegar valor
-    const getVal = (id) => { 
-        const el = document.getElementById(id); 
-        return el ? el.value : ''; 
-    };
+    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
 
     const payload = {
         usuario_solicitante: currentUserLogin,
         usuario: currentUser,
-        
-        // SEÇÃO 1: SISTEMA (IPs e Portas)
         SISTEMA: {
             ip_estacao_meteo: getVal('ip_estacao'),
             port_estacao_meteo: getVal('porta_estacao'),
@@ -625,14 +639,10 @@ async function salvarIPs() {
             ip_cam2: getVal('ip_camera2'),
             port_cam2: getVal('porta_camera2')
         },
-
-        // SEÇÃO 2: TEMPOS
         TEMPOS: {
             intervalo_gravacao_estacao_segundos: tEstacao,
             intervalo_gravacao_termostatos_segundos: tTerm
         },
-
-        // SEÇÃO 3: DASHBOARD (Usa os IDs corretos dash_slot_X)
         DASHBOARD_DISPLAY: {
             slot1: getVal('dash_slot_1'),
             slot2: getVal('dash_slot_2'),
@@ -641,15 +651,23 @@ async function salvarIPs() {
         }
     };
 
-    // Envia para o servidor
-    const d = await API.salvarConfig(payload);
-    if (d.ok) {
-        alert('Configurações do Sistema Salvas!');
-        carregarConfiguracoes(); // Recarrega para confirmar
-    } else {
-        alert('Erro ao salvar: ' + d.erro);
-    }
+    // --- MOSTRA O LOADING ---
+    showLoading("Gravando novas configurações...");
 
+    try {
+        const d = await API.salvarConfig(payload);
+        if (d.ok) {
+            alert('Configurações do Sistema Salvas!');
+            carregarConfiguracoes();
+        } else {
+            alert('Erro ao salvar: ' + d.erro);
+        }
+    } catch(e) {
+        alert('Erro de conexão com o servidor.');
+    } finally {
+        // --- ESCONDE O LOADING SEMPRE ---
+        hideLoading();
+    }
 }
 
 async function salvarConfiguracoesTermostatos() {
@@ -1206,7 +1224,7 @@ async function gerarGridHeliostatos() {
     });
 }
 
-// 2. ABRE MODAL (Resolve o "Fantasma" limpando tudo ANTES de carregar)
+// 2. ABRE MODAL 
 async function abrirModalHeliostato(id) {
     currentHelioID = id;
     const modal = document.getElementById('modalHeliostato');
@@ -1253,9 +1271,14 @@ async function abrirModalHeliostato(id) {
     // 3. Chama a API para buscar o dado real
     await atualizarDadosModal();
 
-    // 4. Inicia o loop de atualização
-    if (timerModalHelio) clearInterval(timerModalHelio);
-    timerModalHelio = setInterval(atualizarDadosModal, 1000); 
+    // 4. Inicia o loop de atualização 
+    if (timerModalHelio) clearTimeout(timerModalHelio);
+    const loopModalHelio = async () => {
+        if (!currentHelioID) return; // Trava de segurança: para se o modal for fechado
+        await atualizarDadosModal();
+        timerModalHelio = setTimeout(loopModalHelio, 1000);
+    };
+    timerModalHelio = setTimeout(loopModalHelio, 1000);
 }
 // 3. ATUALIZA DADOS DO MODAL 
 async function atualizarDadosModal() {
@@ -1353,28 +1376,17 @@ async function enviarComandoHelio(acao) {
         const beta = document.getElementById('inputBeta').value;
         if (!alpha || !beta) return alert("Preencha Alpha e Beta");
         
-        payload = {
-            tipo: 'manual',
-            valores: { alpha: alpha, beta: beta }
-        };
+        payload = { tipo: 'manual', valores: { alpha: alpha, beta: beta } };
     } else if (acao === 'auto') {
-        payload = {
-            tipo: 'modo',
-            valores: { modo: 1 }
-        };
+        payload = { tipo: 'modo', valores: { modo: 1 } };
     } else if (acao === 'stop') {
-        // Parar é basicamente ir para manual sem mover
-        payload = {
-            tipo: 'modo',
-            valores: { modo: 0 }
-        };
+        payload = { tipo: 'modo', valores: { modo: 0 } };
     } else if (acao === 'salvar_vetor') {
-        // Dispara o sinal para salvar a posição atual como o Vetor Receptor
-        payload = {
-            tipo: 'salvar_vetor',
-            valores: {}
-        };
+        payload = { tipo: 'salvar_vetor', valores: {} };
     }
+    
+    // --- MOSTRA O LOADING ---
+    showLoading("Enviando comando ao heliostato...");
     
     try {
         const res = await fetch(`/api/heliostato/${currentHelioID}/comando`, {
@@ -1391,6 +1403,9 @@ async function enviarComandoHelio(acao) {
         }
     } catch (e) {
         alert("Erro de comunicação");
+    } finally {
+        // --- ESCONDE O LOADING SEMPRE ---
+        hideLoading();
     }
 }
 
@@ -1401,18 +1416,19 @@ async function enviarComandoLote(acao) {
         return alert("Acesso Negado: Apenas visualização.");
     }
 
-    // Texto de confirmação dependendo da ação
     let mensagemConfirmacao = "";
     if (acao === 'HORIZ') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição HORIZONTAL (Alpha=0, Beta=0)?";
     if (acao === 'VERT')  mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição VERTICAL (Alpha=90, Beta=180)?";
 
     if (!confirm(mensagemConfirmacao)) return;
 
+    // --- MOSTRA O LOADING ---
+    showLoading("Movendo todos os heliostatos...");
+
     try {
         const res = await API.enviarComandoLote(acao, currentUserLogin);
         
         if (res.ok) {
-            // Monta um resumo de quem recebeu o comando
             let resumo = "Resultado dos Comandos:\n\n";
             res.detalhes.forEach(d => {
                 resumo += `Helio ${d.numero}: ${d.mensagem}\n`;
@@ -1424,6 +1440,9 @@ async function enviarComandoLote(acao) {
     } catch (e) {
         alert("Erro de comunicação ao tentar enviar o comando em lote.");
         console.error(e);
+    } finally {
+        // --- ESCONDE O LOADING SEMPRE ---
+        hideLoading();
     }
 }
 
@@ -1647,13 +1666,10 @@ async function salvarHeliostato() {
     const numInput = document.getElementById('cadNumero');
     const numeroStr = numInput.value.trim();
     
-    // --- 1. VALIDAÇÕES RÍGIDAS DE CAMPOS EM BRANCO ---
     if (!numeroStr) return alert("⚠️ Erro: Falta o campo 'Número'. Ele não pode ficar vazio.");
     const numero = parseInt(numeroStr);
     
-    if (isNaN(numero) || numero < 0 || numero > 999) {
-        return alert("⚠️ Erro: O 'Número' do heliostato deve ser entre 0 e 999.");
-    }
+    if (isNaN(numero) || numero < 0 || numero > 999) return alert("⚠️ Erro: O 'Número' deve ser entre 0 e 999.");
     
     const ip = document.getElementById('cadIP').value.trim();
     if (!ip) return alert("⚠️ Erro: Falta o campo 'Endereço IP'.");
@@ -1672,9 +1688,7 @@ async function salvarHeliostato() {
 
     const posicaoStr = document.getElementById('cadPosicao').value.trim();
     if (!posicaoStr) return alert("⚠️ Erro: Falta selecionar uma 'Posição' no mapa visual.");
-    // -------------------------------------------------
 
-    // Coleta os dados validados e já garantidos que não estão vazios
     const payload = {
         numero: numero,
         usuario_solicitante: currentUserLogin,
@@ -1688,11 +1702,13 @@ async function salvarHeliostato() {
     
     const isEdit = numInput.disabled; 
     
-    // --- 2. VERIFICAÇÃO DE DUPLICIDADE NO FRONTEND ---
     if (!isEdit && listaBasesCache.some(b => String(b.numero) === String(numero))) {
         return alert(`⚠️ Erro: Já existe um heliostato cadastrado com o número ${numero}!`);
     }
     
+    // --- MOSTRA O LOADING ---
+    showLoading("Salvando heliostato no banco de dados...");
+
     try {
         const url = isEdit ? `/api/bases/${numero}` : `/api/bases`;
         const method = isEdit ? 'PUT' : 'POST';
@@ -1712,12 +1728,14 @@ async function salvarHeliostato() {
                 gerarGridHeliostatos(); 
             }
         } else {
-            // Caso escape algum erro do Python, exibe de forma limpa
             alert("❌ Erro ao salvar: " + (res.erro || "Falha desconhecida."));
         }
     } catch (e) {
         console.error("Erro requisição:", e);
         alert("❌ Erro de conexão com o servidor ao tentar salvar.");
+    } finally {
+        // --- ESCONDE O LOADING SEMPRE ---
+        hideLoading();
     }
 }
 
@@ -2038,9 +2056,13 @@ function initVentiladorEvents() {
     // Verifica estado inicial
     verificarModoControle();
     
-    // Inicia loop de atualização (a cada 2s)
-    if(ventiladorUpdateTimer) clearInterval(ventiladorUpdateTimer);
-    ventiladorUpdateTimer = setInterval(atualizarDadosVentilador, 2000);
+// Inicia loop de atualização (a cada 2s) 
+    if(ventiladorUpdateTimer) clearTimeout(ventiladorUpdateTimer);
+    const loopVentilador = async () => {
+        await atualizarDadosVentilador();
+        ventiladorUpdateTimer = setTimeout(loopVentilador, 2000);
+    };
+    loopVentilador(); // Dispara o ciclo
 }
 
 function verificarModoControle() {
@@ -2246,7 +2268,7 @@ function fecharModalHeliostato() {
     
     // Para o timer para não ficar consumindo CPU em segundo plano
     if (timerModalHelio) {
-        clearInterval(timerModalHelio);
+        clearTimeout(timerModalHelio); 
         timerModalHelio = null;
     }
 }
@@ -2408,13 +2430,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initReportDates();
     toggleReportOptions(); 
     
-    // 6. Define os loops de atualização
-    setInterval(updateDateTime, 1000);
-    setInterval(generateHeatmap, 5000); 
-    setInterval(atualizarDados, 2000);  
-    setInterval(atualizarStatusConexao, 5000);
-    setInterval(gerarGridHeliostatos, 2000);
-    setInterval(atualizarStatusCamerasUI, 2000);
+    // 6. Define os loops de atualização 
+    setInterval(updateDateTime, 1000); 
+    
+    const loopHeatmap = async () => { await generateHeatmap(); setTimeout(loopHeatmap, 5000); };
+    const loopDados = async () => { await atualizarDados(); setTimeout(loopDados, 2000); };
+    const loopConexao = async () => { await atualizarStatusConexao(); setTimeout(loopConexao, 5000); };
+    const loopHeliostatos = async () => { await gerarGridHeliostatos(); setTimeout(loopHeliostatos, 2000); };
+    const loopCameras = async () => { await atualizarStatusCamerasUI(); setTimeout(loopCameras, 2000); };
+
+    // Inicia os loops após a primeira chamada já feita na inicialização
+    setTimeout(loopHeatmap, 5000);
+    setTimeout(loopDados, 2000);
+    setTimeout(loopConexao, 5000);
+    setTimeout(loopHeliostatos, 2000);
+    setTimeout(loopCameras, 2000);
 
     // 7. Inicia Ventilador
     initVentiladorEvents();
