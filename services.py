@@ -42,8 +42,35 @@ CACHE_MEMORIA = {
         'ventilador_online': False,
         'emergencia': False
     },
-    'heliostatos': {}
+    'heliostatos': {},
+    'watchdog': { 'estacao': time.time(), 'termostatos': time.time() } # <-- NOVO
 }
+
+def loop_watchdog(app):
+    """
+    Verifica a cada 60 segundos se as threads principais continuam a pulsar.
+    Se passarem 3 minutos (180s) sem pulso, assume-se que a thread travou na rede Modbus 
+    e uma nova instância é lançada automaticamente (Self-Healing).
+    """
+    while True:
+        time.sleep(60)
+        agora = time.time()
+        
+        # 1. Vigia a Estação Meteorológica
+        if (agora - CACHE_MEMORIA['watchdog']['estacao']) > 180:
+            print("[WATCHDOG] ⚠️ Thread da Estação travada/morta! Reiniciando processo...")
+            CACHE_MEMORIA['watchdog']['estacao'] = agora # Reseta para não iniciar em loop
+            t_est = threading.Thread(target=loop_gravacao_estacao, args=(app,))
+            t_est.daemon = True
+            t_est.start()
+            
+        # 2. Vigia os Termostatos
+        if (agora - CACHE_MEMORIA['watchdog']['termostatos']) > 180:
+            print("[WATCHDOG] ⚠️ Thread dos Termostatos travada/morta! Reiniciando processo...")
+            CACHE_MEMORIA['watchdog']['termostatos'] = agora # Reseta para não iniciar em loop
+            t_term = threading.Thread(target=loop_termostatos_e_emergencia, args=(app,))
+            t_term.daemon = True
+            t_term.start()
 
 # --- VARIÁVEL DA MATRIZ ---
 ACTIONS_FILE = os.path.join(BASE_DIR, 'actions.config')
@@ -331,6 +358,9 @@ def loop_termostatos_e_emergencia(app):
     ultimo_historico = 0  
     
     while True:
+        # --- MANDA O PULSO DE VIDA PARA O WATCHDOG ---
+        CACHE_MEMORIA['watchdog']['termostatos'] = time.time()
+        
         with app.app_context():
             try:
                 cfg = carregar_config()
@@ -434,6 +464,7 @@ def loop_termostatos_e_emergencia(app):
                 db.session.rollback()
         
         time.sleep(1)
+
 
 # Câmeras (captura de frames e reconexão)
 

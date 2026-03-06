@@ -56,15 +56,19 @@ def iniciar_threads_background():
         t3 = threading.Thread(target=services.loop_gravacao_heliostatos, args=(app,))
         t3.daemon = True
         t3.start()
-        # ---------------------------------------------------------
         
         # --- Thread de Monitoramento Rápido em Memória ---
         t4 = threading.Thread(target=services.loop_monitoramento_rapido, args=(app,))
         t4.daemon = True
         t4.start()
-        # -------------------------------------------------------
 
-        print(f">>> SISTEMA HELIOT: THREADS DE GRAVAÇÃO INICIADAS (PID: {os.getpid()}) <<<")
+        # --- NOVO: Thread do Watchdog (Self-Healing) ---
+        t5 = threading.Thread(target=services.loop_watchdog, args=(app,))
+        t5.daemon = True
+        t5.start()
+        # ---------------------------------------------------------
+
+        print(f">>> SISTEMA HELIOT: TODAS AS THREADS E WATCHDOG INICIADOS (PID: {os.getpid()}) <<<")
 
 # Chama a função IMEDIATAMENTE. 
 # Assim, mesmo rodando via Gunicorn (Docker), as threads ligam!
