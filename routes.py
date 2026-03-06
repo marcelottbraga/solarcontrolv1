@@ -684,3 +684,81 @@ def api_debug_estacao():
             "erro_real": services.ultimo_erro_interno,
             "dica": "Verifique IP, Porta e se o Simulador está rodando."
         })
+
+# --- ROTAS DA MATRIZ DE AÇÕES E SEGURANÇA ---
+import json
+import os
+
+ACTIONS_FILE = os.path.join(services.BASE_DIR, 'actions.config')
+
+@bp.route('/api/admin/actions', methods=['GET'])
+def api_get_actions():
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado.'}), 403
+    try:
+        # Verifica se o arquivo não existe ou está completamente vazio (0 bytes)
+        if not os.path.exists(ACTIONS_FILE) or os.path.getsize(ACTIONS_FILE) == 0:
+            return jsonify([]) 
+            
+        with open(ACTIONS_FILE, 'r', encoding='utf-8') as f:
+            regras = json.load(f)
+        return jsonify(regras)
+    except Exception as e:
+        print(f"Erro ao ler actions.config: {e}")
+        return jsonify([])
+
+@bp.route('/api/admin/actions', methods=['POST'])
+def api_post_actions():
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado.'}), 403
+    
+    data = request.get_json()
+    try:
+        regras = []
+        # Tenta ler apenas se o arquivo existir e não for vazio
+        if os.path.exists(ACTIONS_FILE) and os.path.getsize(ACTIONS_FILE) > 0:
+            try:
+                with open(ACTIONS_FILE, 'r', encoding='utf-8') as f:
+                    regras = json.load(f)
+            except json.JSONDecodeError:
+                regras = [] # Se estiver vazio ou inválido, ignora e começa uma lista nova
+        
+        nova_regra = {
+            "gatilho": data.get("gatilho"),
+            "comando": data.get("comando")
+        }
+        regras.append(nova_regra)
+        
+        with open(ACTIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(regras, f, indent=4)
+            
+        usuario = session.get('usuario', 'Admin')
+        services.registrar_evento(current_app._get_current_object(), usuario, "SEGURANÇA", f"Criou regra automática: Se [{nova_regra['gatilho']}] -> Executar [{nova_regra['comando']}]")
+        
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
+@bp.route('/api/admin/actions/<int:idx>', methods=['DELETE'])
+def api_delete_actions(idx):
+    if session.get('perfil') != 'Administrador':
+        return jsonify({'ok': False, 'erro': 'Acesso Negado.'}), 403
+    try:
+        if os.path.exists(ACTIONS_FILE) and os.path.getsize(ACTIONS_FILE) > 0:
+            try:
+                with open(ACTIONS_FILE, 'r', encoding='utf-8') as f:
+                    regras = json.load(f)
+            except json.JSONDecodeError:
+                regras = []
+            
+            if 0 <= idx < len(regras):
+                removida = regras.pop(idx)
+                with open(ACTIONS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(regras, f, indent=4)
+                
+                usuario = session.get('usuario', 'Admin')
+                services.registrar_evento(current_app._get_current_object(), usuario, "SEGURANÇA", f"Removeu regra automática do gatilho [{removida['gatilho']}]")
+                
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})

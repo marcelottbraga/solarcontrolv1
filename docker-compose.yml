@@ -7,3 +7,4 @@ services:
       - "8000:9090"
     volumes:
       - ./heliot.config:/app/heliot.config
+      - ./actions.config:/app/actions.config

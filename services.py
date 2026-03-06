@@ -45,6 +45,48 @@ CACHE_MEMORIA = {
     'heliostatos': {}
 }
 
+# --- VARIÁVEL DA MATRIZ ---
+ACTIONS_FILE = os.path.join(BASE_DIR, 'actions.config')
+
+def executar_acoes_matriz(app, gatilho):
+    """
+    Lê a matriz de ações e, se o gatilho coincidir com uma regra,
+    dispara os comandos Modbus de proteção automaticamente em todos os heliostatos.
+    """
+    try:
+        if not os.path.exists(ACTIONS_FILE) or os.path.getsize(ACTIONS_FILE) == 0:
+            return
+            
+        with open(ACTIONS_FILE, 'r', encoding='utf-8') as f:
+            try:
+                regras = json.load(f)
+            except json.JSONDecodeError:
+                return 
+
+        for regra in regras:
+            if regra.get('gatilho') == gatilho:
+                comando = regra.get('comando')
+                print(f"\n[⚠️ MATRIZ DE SEGURANÇA] Gatilho atingido: {gatilho}")
+                print(f"[🤖 AUTOMAÇÃO] Executando ação defensiva: {comando}\n")
+                
+                with app.app_context():
+                    bases = HeliostatoCadastro.query.all()
+                    
+                    if comando == 'HORIZ':
+                        valores = {'alpha': 11.0, 'beta': 0.0}
+                    elif comando == 'VERT':
+                        valores = {'alpha': 90.0, 'beta': 180.0}
+                    else:
+                        continue 
+                        
+                    for b in bases:
+                        enviar_comando_heliostato(b.numero, 'manual', valores)
+                    
+                    registrar_evento(app, "SISTEMA (Automação)", "COMANDO", f"Gatilho de segurança [{gatilho}] disparou o comando em lote [{comando}]")
+                    
+    except Exception as e:
+        print(f"Erro ao executar matriz de ações: {e}")
+
 # Configuração e utilitários
 
 def carregar_config():
@@ -86,47 +128,40 @@ def registrar_evento(app_instance, usuario, tipo, detalhes):
 
 # Leitura Modbus (estação)
 
-def ler_dados_estacao():
+def ler_dados_estacao(app=None):
     config = carregar_config()
     ip = config.get('SISTEMA', 'ip_estacao_meteo', fallback='143.107.188.66')
     porta = config.getint('SISTEMA', 'port_estacao_meteo', fallback=502)
-    slave_id = 1  # Conforme planilha
+    slave_id = 1  
     
     client = ModbusTcpClient(ip, port=porta, timeout=1)
     dados = {}
     
     if client.connect():
         try:
-            # Lê 28 registradores (1314 variáveis * 2 registradores de 16-bit cada)
-            # Endereço 0 corresponde ao 40001
             rr = client.read_holding_registers(address=0, count=28, slave=slave_id)
             
             if not rr.isError():
-                # Decodifica os bytes brutos para Float 32-bit
                 decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Big)
                 
-                print(f"--- DEBUG REGISTRADORES ---")
-                print(f"RAW: {rr.registers}") 
-                # ------------------------------------
-
                 dados = {
-                    'v_bat': round(decoder.decode_32bit_float(), 2),       # 40001-40002
-                    'ghi1': round(decoder.decode_32bit_float(), 2),        # 40003-40004
-                    'dhi': round(decoder.decode_32bit_float(), 2),         # 40005-40006
-                    'bni': round(decoder.decode_32bit_float(), 2),         # 40007-40008
-                    'old': round(decoder.decode_32bit_float(), 2),         # 40009-40010
-                    'lwd': round(decoder.decode_32bit_float(), 2),         # 40011-40012
-                    'vento_vel': round(decoder.decode_32bit_float(), 2),   # 40013-40014
-                    'vento_dir': round(decoder.decode_32bit_float(), 2),   # 40015-40016
-                    'temp_ar': round(decoder.decode_32bit_float(), 2),     # 40017-40018
-                    'umidade_rel': round(decoder.decode_32bit_float(), 2), # 40019-40020
-                    'pressao_atm': round(decoder.decode_32bit_float(), 2), # 40021-40022
-                    'chuva_acum': round(decoder.decode_32bit_float(), 2),  # 40023-40024
-                    'cell_irrad': round(decoder.decode_32bit_float(), 2),  # 40025-40026
-                    'cell_temp': round(decoder.decode_32bit_float(), 2)    # 40027-40028 
+                    'v_bat': round(decoder.decode_32bit_float(), 2),       
+                    'ghi1': round(decoder.decode_32bit_float(), 2),        
+                    'dhi': round(decoder.decode_32bit_float(), 2),         
+                    'bni': round(decoder.decode_32bit_float(), 2),         
+                    'old': round(decoder.decode_32bit_float(), 2),         
+                    'lwd': round(decoder.decode_32bit_float(), 2),         
+                    'vento_vel': round(decoder.decode_32bit_float(), 2),   
+                    'vento_dir': round(decoder.decode_32bit_float(), 2),   
+                    'temp_ar': round(decoder.decode_32bit_float(), 2),     
+                    'umidade_rel': round(decoder.decode_32bit_float(), 2), 
+                    'pressao_atm': round(decoder.decode_32bit_float(), 2), 
+                    'chuva_acum': round(decoder.decode_32bit_float(), 2),  
+                    'cell_irrad': round(decoder.decode_32bit_float(), 2),  
+                    'cell_temp': round(decoder.decode_32bit_float(), 2)    
                 }
                 dados['debug_raw'] = rr.registers
-                checar_limites_estacao(dados, config)
+                checar_limites_estacao(dados, config, app)
             else:
                 print(f"[ERRO MODBUS] Falha leitura Estação: {rr}")
                 
@@ -134,32 +169,32 @@ def ler_dados_estacao():
             return dados
         except Exception as e:
             global ultimo_erro_interno
-            ultimo_erro_interno = str(e)  # <--- Salva o erro real aqui
+            ultimo_erro_interno = str(e)  
             print(f"Erro leitura: {e}")
             return None
     else:
         print(f"[ERRO CONEXAO] Não foi possível conectar em {ip}:{porta}")
     return None
 
-def checar_limites_estacao(dados, config):
+def checar_limites_estacao(dados, config, app=None):
     global ultimo_alarme_registrado
     
-    # Mapeia: Chave do Dicionário de Dados -> (Chave no Config, Nome para Exibir)
+    # Nomes alinhados milimetricamente com o Frontend para a Matriz funcionar
     mapa = {
-        'v_bat': ('v_bat', 'Bateria (V)'),
-        'ghi1': ('ghi1', 'GHI1'),
-        'dhi': ('dhi', 'DHI'),
-        'bni': ('bni', 'BNI'),
-        'old': ('old', 'OLD'),
-        'lwd': ('lwd', 'LWD'),
+        'v_bat': ('v_bat', 'Bateria'),
+        'ghi1': ('ghi1', 'GHI 1 (Global)'),
+        'dhi': ('dhi', 'DHI (Difusa)'),
+        'bni': ('bni', 'BNI (Direta)'),
+        'old': ('old', 'OLD (Onda Longa Emit.)'),
+        'lwd': ('lwd', 'LWD (Onda Longa Desc.)'),
         'vento_vel': ('vento_vel', 'Vel. Vento'),
         'vento_dir': ('vento_dir', 'Dir. Vento'),
         'temp_ar': ('temp_ar', 'Temp. Ar'),
-        'umidade_rel': ('umidade_rel', 'Umidade'),
-        'pressao_atm': ('pressao_atm', 'Pressão'),
+        'umidade_rel': ('umidade_rel', 'Umidade Rel.'),
+        'pressao_atm': ('pressao_atm', 'Pressão Atm.'),
         'chuva_acum': ('chuva_acum', 'Chuva Acum.'),
-        'cell_irrad': ('cell_irrad', 'Cell Irrad.'),
-        'cell_temp': ('cell_temp', 'Temp. Célula')  
+        'cell_irrad': ('cell_irrad', 'Cell_Irrad'),
+        'cell_temp': ('cell_temp', 'Cell_Temp (Célula)')  
     }
 
     try:
@@ -174,22 +209,33 @@ def checar_limites_estacao(dados, config):
             limite_max = config.getfloat(secao, f'{chave_cfg}_max', fallback=None)
 
             msg_alarme = None
+            gatilho_disparado = None
+            
             if limite_min is not None and valor < limite_min:
                 msg_alarme = f"{nome_legivel} Baixo ({valor} < {limite_min})"
+                gatilho_disparado = f"{nome_legivel} Baixo"
             elif limite_max is not None and valor > limite_max:
                 msg_alarme = f"{nome_legivel} Alto ({valor} > {limite_max})"
+                gatilho_disparado = f"{nome_legivel} Alto"
 
             if msg_alarme:
                 ultimo = ultimo_alarme_registrado.get(chave_dados)
                 agora = datetime.now()
                 
-                # Só grava se mudou ou passou 1 minuto (anti-flood)
                 if not ultimo or (agora - ultimo['tempo']).total_seconds() > 60 or ultimo['msg'] != msg_alarme:
-                    novo_alarme = LogAlarme(categoria="Clima", mensagem=msg_alarme, data_hora=agora)
-                    db.session.add(novo_alarme)
-                    db.session.commit()
+                    
+                    if app: # Só grava no banco se o contexto existir
+                        with app.app_context():
+                            novo_alarme = LogAlarme(categoria="Clima", mensagem=msg_alarme, data_hora=agora)
+                            db.session.add(novo_alarme)
+                            db.session.commit()
+                            
                     ultimo_alarme_registrado[chave_dados] = {'tempo': agora, 'msg': msg_alarme}
                     print(f"[ALARME CLIMA] {msg_alarme}")
+                    
+                    # --- A MÁGICA ACONTECE AQUI: DISPARA A AUTOMAÇÃO ---
+                    if app and gatilho_disparado:
+                        executar_acoes_matriz(app, gatilho_disparado)
 
     except Exception as e:
         print(f"Erro ao checar limites: {e}")
@@ -201,7 +247,7 @@ def loop_gravacao_estacao(app):
     while True:
         with app.app_context():
             try:
-                dados = ler_dados_estacao()
+                dados = ler_dados_estacao(app) # <-- Agora passa o 'app'
                 if dados:
                     h = Historico(
                         v_bat=dados.get('v_bat'),
@@ -222,26 +268,67 @@ def loop_gravacao_estacao(app):
                     )
                     db.session.add(h)
                     db.session.commit()
-                    print(f"[HISTORICO] Clima gravado: {dados.get('temp_ar')}C | {dados.get('ghi1')}W/m2")
+                    
             except Exception as e:
                 print(f"Erro thread estação: {e}")
         
         cfg = carregar_config()
-        # Agora lendo diretamente em SEGUNDOS conforme padrão do sistema
         intervalo = cfg.getint('TEMPOS', 'intervalo_gravacao_estacao_segundos', fallback=60)
-        
-        # Garante que não seja zero ou negativo para evitar loop infinito de CPU
         if intervalo < 1: 
             intervalo = 60
-            
         time.sleep(intervalo)
 
 
-#  Loop Unificado: Monitora Emergência + Grava Histórico
+def calcular_maior_hotspot(estado_critico_sensores, linhas=10, colunas=9):
+
+    if not any(estado_critico_sensores):
+        return 0
+
+    visitados = set()
+    maior_cluster = 0
+    
+    # Movimentos possíveis: Cima, Baixo, Esquerda, Direita e as 4 Diagonais
+    direcoes = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+
+    for r in range(linhas):
+        for c in range(colunas):
+            idx = r * colunas + c
+            
+            # Prevenção de erro caso a lista seja menor que a grelha
+            if idx >= len(estado_critico_sensores):
+                break 
+
+            if estado_critico_sensores[idx] and idx not in visitados:
+                # Inicia a procura (DFS) a partir deste sensor crítico
+                tamanho_atual = 0
+                pilha = [(r, c)]
+                visitados.add(idx)
+
+                while pilha:
+                    curr_r, curr_c = pilha.pop()
+                    tamanho_atual += 1
+
+                    for dr, dc in direcoes:
+                        nr, nc = curr_r + dr, curr_c + dc
+                        
+                        # Se o vizinho está dentro dos limites da grelha
+                        if 0 <= nr < linhas and 0 <= nc < colunas:
+                            n_idx = nr * colunas + nc
+                            
+                            # Se o vizinho também está crítico e ainda não foi visitado
+                            if n_idx < len(estado_critico_sensores) and estado_critico_sensores[n_idx] and n_idx not in visitados:
+                                visitados.add(n_idx)
+                                pilha.append((nr, nc))
+
+                if tamanho_atual > maior_cluster:
+                    maior_cluster = tamanho_atual
+
+    return maior_cluster
+
 #  Loop Unificado: Monitora Emergência + Grava Histórico
 def loop_termostatos_e_emergencia(app):
     global emergencia_acionada, alarme_temp_ativo, inicio_contagem_alarme
-    ultimo_historico = 0  # <--- Inicializa em 0 para garantir a primeira gravação imediata
+    ultimo_historico = 0  
     
     while True:
         with app.app_context():
@@ -250,14 +337,13 @@ def loop_termostatos_e_emergencia(app):
                 ip = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
                 porta = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
                 
-                # Busca o intervalo de gravação no arquivo de configuração (padrão 30s)
                 intervalo_gravacao = cfg.getint('TEMPOS', 'intervalo_gravacao_termostatos_segundos', fallback=30)
                 if intervalo_gravacao < 1: 
                     intervalo_gravacao = 30
                 
                 client = ModbusTcpClient(ip, port=porta, timeout=1)
                 if client.connect():
-                    # --- 1. EMERGÊNCIA (Mantido) ---
+                    # --- 1. EMERGÊNCIA (Botão Físico) ---
                     rr_input = client.read_discrete_inputs(address=0, count=1, slave=1)
                     if rr_input.isError():
                         rr_input = client.read_coils(address=0, count=1, slave=1)
@@ -267,67 +353,75 @@ def loop_termostatos_e_emergencia(app):
                             emergencia_acionada = True
                             db.session.add(LogAlarme(categoria="SEGURANÇA", mensagem="EMERGÊNCIA EXTERNA ACIONADA", data_hora=datetime.now()))
                             db.session.commit()
+                            
+                            # --- A MÁGICA: DISPARA AUTOMAÇÃO ---
+                            executar_acoes_matriz(app, "EMERGÊNCIA EXTERNA!")
+                            
                         elif not estado_atual:
                             emergencia_acionada = False
 
-                    # --- 2. LÓGICA DE ALARME E GRAVAÇÃO DE HISTÓRICO ---
+                    # --- 2. LÓGICA DE ALARME (HOTSPOT ADJACENTE) E GRAVAÇÃO ---
                     rr_regs = client.read_holding_registers(address=0, count=90, slave=1)
                     
                     if not rr_regs.isError():
                         regs = rr_regs.registers
                         dados_term = {f'tp{i+1}': round(regs[i] / 10.0, 1) for i in range(90)}
                         
-                        # Salva no cache para o frontend ler rápido
                         CACHE_MEMORIA['termostatos_valores'] = [round(v / 10.0, 1) for v in regs]
                         
                         agora_ts = time.time()
                         agora_dt = datetime.now()
 
-                        # ==========================================
-                        # NOVO: GRAVAÇÃO PERIÓDICA NO BANCO DE DADOS
-                        # ==========================================
+                        # Gravação Histórica
                         if (agora_ts - ultimo_historico) >= intervalo_gravacao:
-                            # Cria uma cópia do dicionário para adicionar a data/hora sem sujar a original
                             dados_hist = dados_term.copy()
                             dados_hist['data_hora'] = agora_dt
-                            
                             db.session.add(HistoricoTermopares(**dados_hist))
                             db.session.commit()
                             ultimo_historico = agora_ts
-                            print(f"[HISTORICO] Termostatos gravados no BD (Intervalo: {intervalo_gravacao}s)")
 
                         # ==========================================
-                        # LÓGICA DE ALARME COM ESTABILIZAÇÃO (4s)
+                        # AVALIAÇÃO DE HOTSPOT E MATRIZ
                         # ==========================================
                         t_max = cfg.getfloat('TERMOSTATOS', 'temp_max', fallback=100.0)
                         t_min = cfg.getfloat('TERMOSTATOS', 'temp_min', fallback=0.0)
                         t_ativa_min = cfg.getboolean('TERMOSTATOS', 'toggle_ativa_min', fallback=False)
                         tolerancia = cfg.getint('TERMOSTATOS', 'num_sensores_alarm', fallback=6)
+                        
+                        grid_linhas = cfg.getint('TERMOSTATOS', 'grid_linhas', fallback=10)
+                        grid_colunas = cfg.getint('TERMOSTATOS', 'grid_colunas', fallback=9)
 
-                        criticos = sum(1 for i in range(90) if dados_term[f'tp{i+1}'] > t_max or (t_ativa_min and dados_term[f'tp{i+1}'] < t_min))
+                        estado_critico_sensores = []
+                        for i in range(90):
+                            val = dados_term[f'tp{i+1}']
+                            is_critico = (val > t_max) or (t_ativa_min and val < t_min)
+                            estado_critico_sensores.append(is_critico)
 
-                        if criticos > tolerancia:
+                        maior_hotspot = calcular_maior_hotspot(estado_critico_sensores, grid_linhas, grid_colunas)
+
+                        if maior_hotspot > tolerancia:
                             if not alarme_temp_ativo:
                                 if inicio_contagem_alarme is None:
                                     inicio_contagem_alarme = agora_ts
-                                    print(f"[AGUARDANDO ESTABILIZAÇÃO] Condição crítica detectada ({criticos} sensores). Aguardando 4s...")
+                                    print(f"[AGUARDANDO ESTABILIZAÇÃO] Condição crítica detetada ({maior_hotspot} sensores adjacentes). Aguardando 4s...")
 
                                 elif (agora_ts - inicio_contagem_alarme) >= 4:
                                     alarme_temp_ativo = True
                                     inicio_contagem_alarme = None 
                                     
-                                    # Grava o histórico também no momento do alarme crítico para garantir a foto exata do momento
                                     dados_alarme = dados_term.copy()
                                     dados_alarme['data_hora'] = agora_dt
                                     db.session.add(HistoricoTermopares(**dados_alarme))
                                     
                                     db.session.add(LogAlarme(
                                         categoria="TERMOSTATOS", 
-                                        mensagem=f"ALERTA: {criticos} sensores críticos (Limite: {t_max}°C)", 
+                                        mensagem=f"ALERTA: HOTSPOT DETETADO! {maior_hotspot} sensores adjacentes críticos (Limite: {t_max}°C)", 
                                         data_hora=agora_dt
                                     ))
                                     db.session.commit()
-                                    print(f"[EVENTO GRAVADO] Alarme estabilizado e registrado com {criticos} sensores.")
+                                    
+                                    # --- A MÁGICA: DISPARA AUTOMAÇÃO ---
+                                    executar_acoes_matriz(app, "Termostatos Críticos")
                         else:
                             if alarme_temp_ativo:
                                 print("[EVENTO FINALIZADO] Temperaturas normalizadas.")
@@ -829,8 +923,8 @@ def loop_monitoramento_rapido(app):
             try:
                 cfg = carregar_config()
                 
-                # 1. ESTAÇÃO METEOROLÓGICA (Apenas leitura para RAM)
-                dados_est = ler_dados_estacao()
+                # 1. ESTAÇÃO METEOROLÓGICA (Passa o 'app' para habilitar alarmes)
+                dados_est = ler_dados_estacao(app)
                 if dados_est:
                     CACHE_MEMORIA['estacao_dados'] = dados_est
                     CACHE_MEMORIA['status_geral']['estacao_online'] = True
@@ -871,5 +965,4 @@ def loop_monitoramento_rapido(app):
             except Exception as e:
                 print(f"Erro no loop de monitoramento rápido: {e}")
 
-        # Aguarda 2 segundos antes de varrer tudo novamente
         time.sleep(2)

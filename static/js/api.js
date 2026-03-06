@@ -32,13 +32,15 @@ const API = {
         } catch (e) { return { ok: false }; }
     },
 
+    /* --- CÂMERAS OCULTADAS TEMPORARIAMENTE ---
     getStatusCameras: async () => {
         try {
             const resp = await fetch('/api/status/cameras');
             return await resp.json();
         } catch (e) { return {}; }
     },
-
+    ------------------------------------------- */
+    
     getTermostatos: async () => {
         try {
             const resp = await fetch('/api/termostatos');

@@ -547,6 +547,7 @@ async function atualizarStatusConexao() {
     }
 }
 
+/* --- CÂMERAS OCULTADAS TEMPORARIAMENTE ---
 async function atualizarStatusCamerasUI() {
     const status = await API.getStatusCameras();
     const lbl1 = document.getElementById('cam1_status');
@@ -560,6 +561,7 @@ async function atualizarStatusCamerasUI() {
         lbl2.style.color = status[2] ? "#00d084" : "#ff4444";
     }
 }
+------------------------------------------- */
 
 // ================= CONFIGURAÇÕES E SALVAMENTO =================
 async function carregarConfiguracoes() {
@@ -794,35 +796,82 @@ async function generateHeatmap() {
     carregarListaSensores(valores);
 }
 
-function verificarAlarmesTemperatura(valores) {
-    let sensoresCriticos = 0;
-    
-    // Filtra a lista de valores para contar quantos infringem os limites atuais
-    valores.forEach((temp) => {
-        if (temp > sensorConfig.max || (sensorConfig.alarmBelowMin && temp < sensorConfig.min)) {
-            sensoresCriticos++;
-        }
-    });
+function calcularMaiorHotspotJS(valores, maxTemp, minTemp, ativaMin, linhas = 10, colunas = 9) {
+    // 1. Cria um array booleano marcando quem está crítico
+    let estadoCritico = valores.map(temp => (temp > maxTemp) || (ativaMin && temp < minTemp));
 
-    // 1. GUARDA O ESTADO DA EMERGÊNCIA ANTES DE LIMPAR O ARRAY
+    if (!estadoCritico.some(v => v)) return 0;
+
+    let visitados = new Set();
+    let maiorCluster = 0;
+    
+    // As 8 direções: Cima, Baixo, Esquerda, Direita e Diagonais
+    const direcoes = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+    for (let r = 0; r < linhas; r++) {
+        for (let c = 0; c < colunas; c++) {
+            let idx = r * colunas + c;
+            if (idx >= estadoCritico.length) break;
+
+            if (estadoCritico[idx] && !visitados.has(idx)) {
+                let tamanhoAtual = 0;
+                let pilha = [[r, c]];
+                visitados.add(idx);
+
+                while (pilha.length > 0) {
+                    let [currR, currC] = pilha.pop();
+                    tamanhoAtual++;
+
+                    for (let [dr, dc] of direcoes) {
+                        let nr = currR + dr;
+                        let nc = currC + dc;
+
+                        if (nr >= 0 && nr < linhas && nc >= 0 && nc < colunas) {
+                            let nIdx = nr * colunas + nc;
+                            if (nIdx < estadoCritico.length && estadoCritico[nIdx] && !visitados.has(nIdx)) {
+                                visitados.add(nIdx);
+                                pilha.push([nr, nc]);
+                            }
+                        }
+                    }
+                }
+                if (tamanhoAtual > maiorCluster) {
+                    maiorCluster = tamanhoAtual;
+                }
+            }
+        }
+    }
+    return maiorCluster;
+}
+
+function verificarAlarmesTemperatura(valores) {
+    // 1. Usa o novo algoritmo de hotspot para contar apenas vizinhos
+    const maiorHotspot = calcularMaiorHotspotJS(
+        valores, 
+        sensorConfig.max, 
+        sensorConfig.min, 
+        sensorConfig.alarmBelowMin, 
+        10, 9 // 10 linhas, 9 colunas
+    );
+
+    // 2. GUARDA O ESTADO DA EMERGÊNCIA ANTES DE LIMPAR O ARRAY
     const temEmergencia = alarmesGlobais.termostatos.includes("EMERGÊNCIA EXTERNA!");
 
-    // 2. Reseta o array de alarmes de termostatos
+    // 3. Reseta o array de alarmes de termostatos
     alarmesGlobais.termostatos = [];
 
-    // 3. REINSERE A EMERGÊNCIA SE ELA ESTAVA ATIVA
+    // 4. REINSERE A EMERGÊNCIA SE ELA ESTAVA ATIVA
     if (temEmergencia) {
         alarmesGlobais.termostatos.push("EMERGÊNCIA EXTERNA!");
     }
 
-    // DISPARO DO ALARME: Se a quantidade de sensores em erro for MAIOR que a tolerância
-    // Ex: Se tolerância é 6, precisa de 7 sensores para disparar.
-    if (sensoresCriticos > sensorConfig.tolerance) {
+    // 5. DISPARO DO ALARME: Se o MAIOR HOTSPOT for MAIOR que a tolerância
+    if (maiorHotspot > sensorConfig.tolerance) {
         alarmesGlobais.termostatos.push("Termostatos Críticos");
-        console.warn(`[ALARME] ${sensoresCriticos} sensores críticos detectados (Limite: ${sensorConfig.tolerance})`);
+        console.warn(`[ALARME] Hotspot perigoso detetado! ${maiorHotspot} sensores críticos adjacentes (Limite: ${sensorConfig.tolerance})`);
     }
 
-    // Chama a interface. Como agora o array não "pisca" mais, a sirene ficará armada continuamente!
+    // Chama a interface.
     atualizarInterfaceAlarmes();
 }
 
@@ -849,6 +898,9 @@ function verificarAlarmesEstacao(dados) {
     atualizarInterfaceAlarmes();
 }
 
+// --- VARIÁVEL DE ESTADO DA SIRENE MANUAL ---
+let sireneSilenciadaManualmente = false;
+
 function atualizarInterfaceAlarmes() {
     const container = document.querySelector('.alarm-global-card');
     const icon = document.getElementById('alarme_global_icon');
@@ -867,24 +919,79 @@ function atualizarInterfaceAlarmes() {
         return idxA - idxB;
     });
 
-    if (alarmeAtivo !== ultimoEstadoSirene) {
-        API.setSirene(alarmeAtivo);
-        ultimoEstadoSirene = alarmeAtivo;
+    // 1. Destrava a sirene automaticamente se todos os alarmes sumirem
+    if (!alarmeAtivo) {
+        sireneSilenciadaManualmente = false;
     }
 
+    // 2. A Sirene só deve tocar se houver alarme E não tiver sido silenciada pelo utilizador
+    const deveTocarSirene = alarmeAtivo && !sireneSilenciadaManualmente;
+
+    if (deveTocarSirene !== ultimoEstadoSirene) {
+        API.setSirene(deveTocarSirene);
+        ultimoEstadoSirene = deveTocarSirene;
+    }
+
+    // 3. Interface Visual do Banner
     if (alarmeAtivo && container) {
         container.style.background = 'rgba(255, 68, 68, 0.15)';
-        if(icon) icon.textContent = '🚨';
+        
+        // Altera o ícone e adiciona o evento de clique
+        if(icon) {
+            icon.textContent = sireneSilenciadaManualmente ? '🔕' : '🚨';
+            icon.style.cursor = 'pointer';
+            icon.title = sireneSilenciadaManualmente ? 'Sirene Física Silenciada' : 'Clique para silenciar a sirene física';
+            icon.onclick = iniciarSilenciamentoSirene;
+        }
+        
         const alarmePrincipal = todosAlarmes[0];
         if (qtdAlarmes === 1) if(status) status.textContent = `ATENÇÃO: ${alarmePrincipal}`;
         else if(status) status.textContent = `ATENÇÃO: ${alarmePrincipal} (+${qtdAlarmes - 1})`;
         if(counterDiv) counterDiv.textContent = `${qtdAlarmes} alarmes ativos`;
+        
     } else if (container) {
         container.style.background = 'linear-gradient(120deg, rgba(255, 68, 68, 0.08), rgba(0, 208, 132, 0.05))';
-        if(icon) icon.textContent = '✅';
+        if(icon) {
+            icon.textContent = '✅';
+            icon.style.cursor = 'default';
+            icon.title = '';
+            icon.onclick = null; // Remove o evento de clique quando está tudo normal
+        }
         if(status) status.textContent = "Sistema Monitorando";
         if(counterDiv) counterDiv.textContent = "0 alarmes ativos";
     }
+}
+
+// --- FUNÇÕES DOS MODAIS DE SILENCIAMENTO DA SIRENE ---
+
+function iniciarSilenciamentoSirene() {
+    if (currentProfile === 'Visualizador') return alert("Acesso restrito. Apenas Operadores ou Administradores podem silenciar a sirene.");
+    
+    if (sireneSilenciadaManualmente) return alert("A sirene física já foi silenciada para os alarmes atuais.");
+
+    document.getElementById('modalSilenciar1').style.display = 'flex';
+}
+
+function confirmarSilenciamentoEtapa1() {
+    document.getElementById('modalSilenciar1').style.display = 'none';
+    document.getElementById('modalSilenciar2').style.display = 'flex';
+}
+
+function cancelarSilenciamento() {
+    document.getElementById('modalSilenciar1').style.display = 'none';
+    document.getElementById('modalSilenciar2').style.display = 'none';
+}
+
+function confirmarSilenciamentoFinal() {
+    document.getElementById('modalSilenciar2').style.display = 'none';
+    
+    // Altera a variável global
+    sireneSilenciadaManualmente = true;
+    
+    // Força a atualização da interface (o que vai disparar a API para desligar o Modbus da sirene na hora)
+    atualizarInterfaceAlarmes(); 
+    
+    alert("A sirene física foi DESLIGADA. O painel continuará exibindo as luzes de emergência.");
 }
 
 // ================= UTILITÁRIOS =================
@@ -2012,7 +2119,7 @@ function atualizarFrameReplay(index) {
     }
 }
 
-// ================= EASTER EGG (SECRET EDITOR) =================
+// ================= EASTER EGGS (SECRET EDITOR E MATRIZ DE AÇÕES) =================
 
 let eggClicks = 0;
 let eggTimer = null;
@@ -2020,19 +2127,22 @@ let eggTimer = null;
 function triggerEasterEgg() {
     eggClicks++;
     
-    // Se tiver um timer rodando, limpa ele (o usuário foi rápido)
+    // Limpa o timer para o utilizador poder continuar a clicar
     if (eggTimer) clearTimeout(eggTimer);
 
-    // Se chegou a 3 cliques
-    if (eggClicks === 3) {
-        eggClicks = 0; // Zera para a próxima
-        abrirEditorSecreto(); // BINGO!
-    } else {
-        // Se não clicou de novo em 500ms (meio segundo), zera a contagem
-        eggTimer = setTimeout(() => {
-            eggClicks = 0;
-        }, 500);
-    }
+    // Inicia uma contagem decrescente curta. Se o utilizador parar de clicar por 400ms, avaliamos o resultado.
+    eggTimer = setTimeout(() => {
+        if (eggClicks === 3) {
+            // 3 Cliques: Easter Egg Antigo (Editor Raw)
+            abrirEditorSecreto();
+        } else if (eggClicks >= 5) {
+            // 5+ Cliques: Novo Easter Egg (Matriz de Ações)
+            abrirMatrizAcoes();
+        }
+        
+        // Zera os cliques após a execução
+        eggClicks = 0;
+    }, 400); 
 }
 
 async function abrirEditorSecreto() {
@@ -2066,6 +2176,107 @@ async function salvarConfigSecreta() {
         carregarConfiguracoes(); // Recarrega na hora para aplicar
     } else {
         alert("Erro ao gravar: " + dados.erro);
+    }
+}
+
+// --- FUNÇÕES DA MATRIZ DE AÇÕES E SEGURANÇA ---
+
+function abrirMatrizAcoes() {
+    if (currentProfile !== 'Administrador') {
+        return alert("Acesso restrito. Apenas desenvolvedores/administradores podem acessar a Matriz de Segurança.");
+    }
+    document.getElementById('modalMatrizAcoes').style.display = 'flex';
+    carregarMatrizAcoesInterface(); 
+}
+
+function fecharMatrizAcoes() {
+    document.getElementById('modalMatrizAcoes').style.display = 'none';
+}
+
+function abrirFormNovaAcao() {
+    document.getElementById('acaoGatilho').value = "Vel. Vento Alto";
+    document.getElementById('acaoComando').value = "HORIZ";
+    document.getElementById('modalFormAcao').style.display = 'flex';
+}
+
+function fecharFormAcao() {
+    document.getElementById('modalFormAcao').style.display = 'none';
+}
+
+async function carregarMatrizAcoesInterface() {
+    const tbody = document.getElementById('tabelaMatrizAcoes');
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 25px; color: #aaa;">Carregando regras...</td></tr>';
+    
+    try {
+        const resp = await fetch('/api/admin/actions');
+        const regras = await resp.json();
+        
+        tbody.innerHTML = '';
+        if (regras.length === 0 || regras.erro) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 25px; color: #aaa; font-style: italic;">Nenhuma regra configurada. A planta está operando sem autonomia de segurança.</td></tr>';
+            return;
+        }
+        
+        regras.forEach((regra, index) => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #444';
+            tr.innerHTML = `
+                <td style="padding: 12px; font-weight: bold; color: #ff6b6b;">${regra.gatilho}</td>
+                <td style="padding: 12px; color: var(--color-primary);">${regra.comando}</td>
+                <td style="padding: 12px; text-align: center;">
+                    <button class="btn-danger" style="padding: 4px 10px; font-size: 0.8em;" onclick="apagarAcaoInterface(${index})">🗑️ Excluir</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 25px; color: #ff4444;">Erro de conexão ao carregar as regras.</td></tr>';
+    }
+}
+
+async function salvarAcaoInterface() {
+    const gatilho = document.getElementById('acaoGatilho').value;
+    const comando = document.getElementById('acaoComando').value;
+    
+    showLoading("Salvando regra de segurança...");
+    try {
+        const resp = await fetch('/api/admin/actions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gatilho, comando })
+        });
+        const result = await resp.json();
+        
+        if (result.ok) {
+            fecharFormAcao();
+            carregarMatrizAcoesInterface(); // Recarrega a tabela instantaneamente
+        } else {
+            alert("Erro ao salvar: " + (result.erro || "Desconhecido"));
+        }
+    } catch (e) {
+        alert("Erro de comunicação com o servidor.");
+    } finally {
+        hideLoading();
+    }
+}
+
+async function apagarAcaoInterface(index) {
+    if (!confirm("Tem certeza que deseja remover esta regra de segurança? O sistema deixará de atuar automaticamente neste caso.")) return;
+    
+    showLoading("Removendo regra...");
+    try {
+        const resp = await fetch(`/api/admin/actions/${index}`, { method: 'DELETE' });
+        const result = await resp.json();
+        
+        if (result.ok) {
+            carregarMatrizAcoesInterface(); // Recarrega a tabela instantaneamente
+        } else {
+            alert("Erro ao remover: " + (result.erro || "Desconhecido"));
+        }
+    } catch (e) {
+        alert("Erro de comunicação com o servidor.");
+    } finally {
+        hideLoading();
     }
 }
 
@@ -2501,7 +2712,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(loopDados, 2000);
     setTimeout(loopConexao, 5000);
     setTimeout(loopHeliostatos, 2000);
-    setTimeout(loopCameras, 2000);
+    // setTimeout(loopCameras, 2000); // CÂMERAS OCULTADAS TEMPORARIAMENTE
 
     // 7. Inicia Ventilador
     initVentiladorEvents();
