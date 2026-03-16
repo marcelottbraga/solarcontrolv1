@@ -143,23 +143,23 @@ def ler_dados_estacao(app=None):
             rr = client.read_holding_registers(address=0, count=28, slave=slave_id)
             
             if not rr.isError():
-                decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Big)
+                decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Little)
                 
                 dados = {
-                    'v_bat': round(decoder.decode_32bit_float(), 2),       
-                    'ghi1': round(decoder.decode_32bit_float(), 2),        
-                    'dhi': round(decoder.decode_32bit_float(), 2),         
-                    'bni': round(decoder.decode_32bit_float(), 2),         
-                    'old': round(decoder.decode_32bit_float(), 2),         
-                    'lwd': round(decoder.decode_32bit_float(), 2),         
-                    'vento_vel': round(decoder.decode_32bit_float(), 2),   
-                    'vento_dir': round(decoder.decode_32bit_float(), 2),   
-                    'temp_ar': round(decoder.decode_32bit_float(), 2),     
-                    'umidade_rel': round(decoder.decode_32bit_float(), 2), 
-                    'pressao_atm': round(decoder.decode_32bit_float(), 2), 
-                    'chuva_acum': round(decoder.decode_32bit_float(), 2),  
-                    'cell_irrad': round(decoder.decode_32bit_float(), 2),  
-                    'cell_temp': round(decoder.decode_32bit_float(), 2)    
+                    'v_bat': round(decoder.decode_32bit_float(), 3),       
+                    'ghi1': round(decoder.decode_32bit_float(), 3),        
+                    'dhi': round(decoder.decode_32bit_float(), 3),         
+                    'bni': round(decoder.decode_32bit_float(), 3),         
+                    'old': round(decoder.decode_32bit_float(), 3),         
+                    'lwd': round(decoder.decode_32bit_float(), 3),         
+                    'vento_vel': round(decoder.decode_32bit_float(), 3),   
+                    'vento_dir': round(decoder.decode_32bit_float(), 3),   
+                    'temp_ar': round(decoder.decode_32bit_float(), 3),     
+                    'umidade_rel': round(decoder.decode_32bit_float(), 3), 
+                    'pressao_atm': round(decoder.decode_32bit_float(), 3), 
+                    'chuva_acum': round(decoder.decode_32bit_float(), 3),  
+                    'cell_irrad': round(decoder.decode_32bit_float(), 3),  
+                    'cell_temp': round(decoder.decode_32bit_float(), 3)    
                 }
                 dados['debug_raw'] = rr.registers
                 checar_limites_estacao(dados, config, app)
@@ -508,7 +508,7 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
         ])
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
-            def fmt(val): return str(val).replace('.', ',') if val is not None else ''
+            def fmt(val): return f"{val:.3f}".replace('.', ',') if val is not None else ''
             writer.writerow([
                 r.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
@@ -918,20 +918,25 @@ def loop_gravacao_heliostatos(app):
 def loop_monitoramento_rapido(app):
     """Worker rápido para manter os dados em memória RAM e evitar lentidão na UI."""
     global CACHE_MEMORIA, emergencia_acionada
-    
+    ultimo_tempo_estacao = 0
+
     while True:
         with app.app_context():
             try:
                 cfg = carregar_config()
-                
+                agora = time.time()
+
                 # 1. ESTAÇÃO METEOROLÓGICA (Passa o 'app' para habilitar alarmes)
-                dados_est = ler_dados_estacao(app)
-                if dados_est:
-                    CACHE_MEMORIA['estacao_dados'] = dados_est
-                    CACHE_MEMORIA['status_geral']['estacao_online'] = True
-                else:
-                    CACHE_MEMORIA['status_geral']['estacao_online'] = False
+                if (agora - ultimo_tempo_estacao) >= 10:
+                    dados_est = ler_dados_estacao(app)
+                    if dados_est:
+                        CACHE_MEMORIA['estacao_dados'] = dados_est
+                        CACHE_MEMORIA['status_geral']['estacao_online'] = True
+                    else:
+                        CACHE_MEMORIA['status_geral']['estacao_online'] = False
                     
+                    ultimo_tempo_estacao = agora
+
                 # 2. TERMOSTATOS (Ping rápido)
                 ip_term = cfg.get('SISTEMA', 'ip_termostatos', fallback='172.18.0.1')
                 port_term = cfg.getint('SISTEMA', 'port_termostatos', fallback=503)
