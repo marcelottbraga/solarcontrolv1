@@ -520,94 +520,104 @@ def api_status_heliostatos():
     """Retorna status resumido INSTANTÂNEO lendo da memória RAM"""
     bases = HeliostatoCadastro.query.all()
     lista = {}
-    
+
     for b in bases:
         num = b.numero
-        # Pega do cache (se não existir ainda, usa um estado offline padrão)
-        dados_reais = services.CACHE_MEMORIA.get('heliostatos', {}).get(num, {
-            "online": False,
-            "status_code": 0,
-            "status": "Aguardando leitura..."
-        })
-        
+        # Pega do cache
+        dados_reais = services.CACHE_MEMORIA.get('heliostatos', {}).get(num, {})
+
         lista[num] = {
             "configurado": True,
             "ip": b.ip,
             "posicao": b.posicao,
-            "online": dados_reais.get('online', False),         
-            "status_code": dados_reais.get('status_code', 0), 
-            "status": dados_reais.get('status', 'Desconhecido')          
+            "online": dados_reais.get('online', False),
+            "status_code": dados_reais.get('status_code', 0),
+            "status": dados_reais.get('status', 'Desconhecido'),
+            "alpha": dados_reais.get('alpha', '--'),
+            "beta": dados_reais.get('beta', '--'),
+            "modo": dados_reais.get('modo', '--')
         }
-            
+
     return jsonify(lista)
 
 @bp.route('/api/heliostato/<id_helio>', methods=['GET'])
 def api_detalhe_heliostato(id_helio):
-    """Lê da memória RAM para o Popup abrir instantaneamente"""
     try:
         num = int(id_helio)
         dados = services.CACHE_MEMORIA.get('heliostatos', {}).get(num)
-        if dados:
-            return jsonify(dados)
-        else:
+        
+        if dados: 
+            # ---> A CORREÇÃO: Cria um dicionário blindado apenas com texto e números <---
+            dados_seguros = {
+                "online": dados.get('online', False),
+                "status_code": dados.get('status_code', 0),
+                "status": dados.get('status', 'Desconhecido'),
+                "alpha": dados.get('alpha', '--'),
+                "beta": dados.get('beta', '--'),
+                "modo": dados.get('modo', '--')
+            }
+            return jsonify(dados_seguros)
+        else: 
             return jsonify({"online": False, "erro_real": "Aguardando primeira leitura do sistema..."})
     except:
         return jsonify({"online": False, "erro_real": "ID Inválido"})
 
 @bp.route('/api/heliostato/<id_helio>/comando', methods=['POST'])
 def api_comando_heliostato(id_helio):
-    data = request.get_json()
-    tipo = data.get('tipo')
-    valores = data.get('valores')
-    usuario = data.get('usuario', 'Sistema') # <--- NOVO: Recebe o utilizador
-    
-    res = services.enviar_comando_heliostato(id_helio, tipo, valores)
-    
-    # <--- NOVO: REGISTRA NO LOG DE EVENTOS SE O COMANDO FOI ENVIADO --->
-    if res.get("ok"):
-        detalhes = f"Comando '{tipo}' enviado ao Helio {id_helio}. Valores: {valores}"
-        services.registrar_evento(current_app._get_current_object(), usuario, "COMANDO", detalhes)
+    try:
+        # Garante que o ID é tratado como número inteiro
+        id_int = int(id_helio)
+        data = request.get_json()
+        tipo = data.get('tipo')
+        valores = data.get('valores')
+        usuario = data.get('usuario', 'Sistema')
         
-    return jsonify(res)
-
+        # Chama a função de comunicação Modbus no services.py
+        res = services.enviar_comando_heliostato(id_int, tipo, valores)
+        
+        if res and isinstance(res, dict) and res.get("ok"):
+            detalhes = f"Comando '{tipo}' enviado ao Helio {id_int}. Valores: {valores}"
+            services.registrar_evento(current_app._get_current_object(), usuario, "COMANDO", detalhes)
+            
+        return jsonify(res if res else {"ok": False, "msg": "Sem resposta do Modbus."})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "msg": f"Erro no Python: {str(e)}"})
+        
 @bp.route('/api/heliostatos/comando_lote', methods=['POST'])
 def api_comando_lote_heliostatos():
     data = request.get_json()
-    acao = data.get('acao') # Espera receber 'HORIZ' ou 'VERT'
+    acao = data.get('acao') # Pode vir 'HORIZ', 'VERT', etc. da tela
     usuario = data.get('usuario', 'Sistema')
     
-    # 1. Pega todos os equipamentos cadastrados no banco
     bases = HeliostatoCadastro.query.all()
     resultados = []
     
     for b in bases:
-        # 2. Define os ângulos baseados na ação
-        if acao == 'HORIZ':
-            valores = {'alpha': 11.0, 'beta': 0.0}
+        # Se clicar no botão em lote que antes mandava 11 e 0, agora ele cutuca o ESP32
+        if acao == 'HORIZ' or acao == 'STOW':
+            res = services.enviar_comando_heliostato(b.numero, 'stow')
         elif acao == 'VERT':
             valores = {'alpha': 90.0, 'beta': 180.0}
+            res = services.enviar_comando_heliostato(b.numero, 'manual', valores)
         else:
             return jsonify({"ok": False, "erro": "Ação inválida."})
             
-        # 3. Chama a função de serviço (ela já tenta conectar e falha se estiver offline)
-        res = services.enviar_comando_heliostato(b.numero, 'manual', valores)
-        
-        # 4. Guarda o resultado para sabermos quem respondeu
         resultados.append({
             "numero": b.numero, 
             "sucesso": res.get("ok"), 
             "mensagem": res.get("msg", "Comando enviado")
         })
         
-    # Registra a ação geral no log de eventos
     services.registrar_evento(current_app._get_current_object(), usuario, "COMANDO", f"Enviou comando em lote ({acao}) para todos os heliostatos")
         
     return jsonify({"ok": True, "detalhes": resultados})
     
+       
     
-    
-    
-    # --- NOVAS ROTAS DE CONFIGURAÇÃO ---
+# --- NOVAS ROTAS DE CONFIGURAÇÃO ---
 
 @bp.route('/api/config/salvar', methods=['POST'])
 def api_salvar_config_geral():
