@@ -854,6 +854,10 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
             elif tipo_comando == 'stow':
                 client.write_register(address=14, value=1)
                 sucesso = True
+            
+            elif tipo_comando == 'set_zero':
+                client.write_register(address=13, value=1) 
+                sucesso = True
 
         except Exception as e:
             print(f"Erro escrita Heliostato: {e}")

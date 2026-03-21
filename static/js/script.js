@@ -1374,10 +1374,14 @@ async function gerarGridHeliostatos() {
                 if (!isOnline) {
                     cell.classList.add('status-red');
                     cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - Offline`;
+                } else if (dadosHelio.status_code === 1) {
+                    cell.style.backgroundColor = '#00d084'; 
+                    cell.style.color = '#000';
+                    cell.style.border = 'none';
+                    cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - MOVENDO...`;
                 } else {
                     cell.classList.add('status-blue');
-                    if (dadosHelio.status_code === 1) cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - MOVENDO...`;
-                    else cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - Online`;
+                    cell.title = `Helio ${helioNumero} (Pos ${posicaoAtual}) - Online`;
                 }
             }
             rowDiv.appendChild(cell);
@@ -1446,84 +1450,74 @@ async function abrirModalHeliostato(id) {
 // 3. ATUALIZA DADOS DO MODAL 
 async function atualizarDadosModal() {
     if (!currentHelioID) return;
-    
+
     try {
         const res = await fetch(`/api/heliostato/${currentHelioID}`);
         const dados = await res.json();
-        
+
         const btnMover = document.getElementById('btnMover');
         const inpAlpha = document.getElementById('inputAlpha');
         const inpBeta = document.getElementById('inputBeta');
         const elStatus = document.getElementById('modalHelioStatus');
         const elModo = document.getElementById('modalHelioModo');
-        const elBorder = document.getElementById('statusBorder'); 
+        const elBorder = document.getElementById('statusBorder');
 
-        // Lógica de Override: Movendo (1) conta como Online
         let isOnline = (String(dados.online).toLowerCase() === 'true' || dados.online == 1);
         if (dados.status_code === 1) isOnline = true;
 
         if (isOnline) {
-            // --- ONLINE ---
-            document.getElementById('valAlpha').textContent = (dados.alpha || 0).toFixed(2) + '°';
-            document.getElementById('valBeta').textContent = (dados.beta || 0).toFixed(2) + '°';
-            //document.getElementById('valTheta').textContent = (dados.theta || 0).toFixed(2) + '°'; nao vai mais ter por enquanto
-        
-            if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
+            let vAlpha = "--";
+            if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
+                vAlpha = parseFloat(dados.alpha).toFixed(2) + '°';
+            }
             
-            if (dados.status_code === 1) { 
-                // MOVENDO
-                if(elStatus) { elStatus.textContent = "MOVENDO"; elStatus.style.color = '#00d084'; }
-                if(elBorder) elBorder.style.borderLeftColor = '#00d084';
-                
-                if(btnMover) {
-                    btnMover.disabled = true;
-                    btnMover.textContent = "MOVENDO...";
-                    btnMover.style.opacity = "0.6";
-                    btnMover.style.cursor = "wait";
-                }
-                if(inpAlpha) inpAlpha.disabled = true;
-                if(inpBeta) inpBeta.disabled = true;
-
-            } else { 
-                // OCIOSO / PARADO
-                if(elStatus) { 
-                    elStatus.textContent = (dados.status || 'ONLINE').toUpperCase(); 
-                    elStatus.style.color = '#00a8ff'; 
-                }
-                if(elBorder) elBorder.style.borderLeftColor = '#00a8ff';
-
-                if(btnMover) {
-                    btnMover.disabled = false;
-                    btnMover.textContent = "MOVER PARA POSIÇÃO";
-                    btnMover.style.opacity = "1";
-                    btnMover.style.cursor = "pointer";
-                }
-                if(inpAlpha) inpAlpha.disabled = false;
-                if(inpBeta) inpBeta.disabled = false;
+            let vBeta = "--";
+            if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
+                vBeta = parseFloat(dados.beta).toFixed(2) + '°';
             }
 
+            // ---> A CORREÇÃO: USANDO OS SEUS IDs ORIGINAIS <---
+            const elAlpha = document.getElementById('valAlpha');
+            if (elAlpha) elAlpha.textContent = vAlpha;
+            
+            const elBeta = document.getElementById('valBeta');
+            if (elBeta) elBeta.textContent = vBeta;
+            // ----------------------------------------------------
+
+            if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
+
+            if (dados.status_code === 1) {
+                if(elStatus) { elStatus.textContent = "MOVENDO"; elStatus.style.color = '#00d084'; }
+                if(elBorder) elBorder.style.borderLeftColor = '#00d084';
+                if(btnMover) { btnMover.disabled = true; btnMover.textContent = "MOVENDO..."; btnMover.style.opacity = "0.6"; btnMover.style.cursor = "wait"; }
+                if(inpAlpha) inpAlpha.disabled = true; if(inpBeta) inpBeta.disabled = true;
+            } else {
+                if(elStatus) { elStatus.textContent = (dados.status || 'ONLINE').toUpperCase(); elStatus.style.color = '#00a8ff'; }
+                if(elBorder) elBorder.style.borderLeftColor = '#00a8ff';
+                if(btnMover) { btnMover.disabled = false; btnMover.textContent = "MOVER PARA POSIÇÃO"; btnMover.style.opacity = "1"; btnMover.style.cursor = "pointer"; }
+                if(inpAlpha) inpAlpha.disabled = false; if(inpBeta) inpBeta.disabled = false;
+            }
         } else {
-            // --- OFFLINE ---
             if(elStatus) { elStatus.textContent = "OFFLINE"; elStatus.style.color = '#aaa'; }
             if(elModo) elModo.textContent = "---";
             if(elBorder) elBorder.style.borderLeftColor = '#aaa';
-            
-            document.getElementById('valAlpha').textContent = "--";
-            document.getElementById('valBeta').textContent = "--";
-            //document.getElementById('valTheta').textContent = "--"; standby por hora
 
-            // Garante bloqueio
-            if(btnMover) {
-                btnMover.disabled = true;
-                btnMover.textContent = "SEM CONEXÃO";
-                btnMover.style.opacity = "0.4";
-                btnMover.style.cursor = "not-allowed";
-            }
-            if(inpAlpha) inpAlpha.disabled = true;
-            if(inpBeta) inpBeta.disabled = true;
+            const elAlpha = document.getElementById('valAlpha');
+            if (elAlpha) elAlpha.textContent = "--";
+            
+            const elBeta = document.getElementById('valBeta');
+            if (elBeta) elBeta.textContent = "--";
+
+            if(btnMover) { btnMover.disabled = true; btnMover.textContent = "SEM CONEXÃO"; btnMover.style.opacity = "0.4"; btnMover.style.cursor = "not-allowed"; }
+            if(inpAlpha) inpAlpha.disabled = true; if(inpBeta) inpBeta.disabled = true;
         }
     } catch (e) {
         console.error("Erro no modal:", e);
+        const elStatus = document.getElementById('modalHelioStatus');
+        if (elStatus && elStatus.textContent === "CARREGANDO...") {
+            elStatus.textContent = "ERRO DE LEITURA";
+            elStatus.style.color = '#ff4444';
+        }
     }
 }
 
@@ -1539,8 +1533,8 @@ async function enviarComandoHelio(acao) {
         const beta = document.getElementById('inputBeta').value;
         if (!alpha || !beta) return alert("Preencha Alpha e Beta");
         
-        // NOVO: Adicionado "usuario: currentUser"
-        payload = { tipo: 'manual', valores: { alpha: alpha, beta: beta }, usuario: currentUser };
+        // Força a conversão para Float (Número) em vez de Texto
+        payload = { tipo: 'manual', valores: { alpha: parseFloat(alpha), beta: parseFloat(beta) }, usuario: currentUser };
     } else if (acao === 'auto') {
         payload = { tipo: 'modo', valores: { modo: 1 }, usuario: currentUser };
     } else if (acao === 'stop') {
@@ -1549,7 +1543,6 @@ async function enviarComandoHelio(acao) {
         payload = { tipo: 'salvar_vetor', valores: {}, usuario: currentUser };
     }
     
-    // --- MOSTRA O LOADING ---
     showLoading("Enviando comando ao heliostato...");
     
     try {
@@ -1558,21 +1551,89 @@ async function enviarComandoHelio(acao) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
+        
+        if (!res.ok) {
+            alert("Erro HTTP " + res.status + " no Servidor Python.");
+            return;
+        }
+
         const json = await res.json();
         if (json.ok) {
-            alert("Comando Enviado!");
-            atualizarDadosModal(); // Atualiza UI
+            alert("Comando Aceite!");
+            atualizarDadosModal(); 
         } else {
-            alert("Erro: " + (json.msg || "Falha desconhecida"));
+            alert("Erro: " + (json.msg || json.erro || "Falha desconhecida no Modbus"));
         }
     } catch (e) {
-        alert("Erro de comunicação");
+        alert("Erro de comunicação com o servidor.");
     } finally {
-        // --- ESCONDE O LOADING SEMPRE ---
         hideLoading();
     }
 }
+// ================= FUNÇÕES DO JOG WEB E ZERAMENTO =================
 
+function jogHeliostato(eixo, direcao) {
+    if (!currentHelioID) return alert("Nenhum Heliostato selecionado!");
+
+    // Descobre qual o passo selecionado
+    const stepRadios = document.getElementsByName('jogStep');
+    let stepVal = 0.1;
+    for (let r of stepRadios) {
+        if (r.checked) { stepVal = parseFloat(r.value); break; }
+    }
+
+    const inputAlfa = document.getElementById('inputAlpha');
+    const inputBeta = document.getElementById('inputBeta');
+
+    let alfaAtual = parseFloat(inputAlfa.value);
+    if (isNaN(alfaAtual)) alfaAtual = parseFloat(document.getElementById('valAlpha').textContent) || 0;
+
+    let betaAtual = parseFloat(inputBeta.value);
+    if (isNaN(betaAtual)) betaAtual = parseFloat(document.getElementById('valBeta').textContent) || 0;
+
+    if (eixo === 'A') {
+        alfaAtual += (stepVal * direcao);
+        inputAlfa.value = alfaAtual.toFixed(3);
+        if (inputBeta.value === "") inputBeta.value = betaAtual.toFixed(3);
+    } else if (eixo === 'B') {
+        betaAtual += (stepVal * direcao);
+        inputBeta.value = betaAtual.toFixed(3);
+        if (inputAlfa.value === "") inputAlfa.value = alfaAtual.toFixed(3);
+    }
+
+    // Dispara o comando manual com as novas coordenadas incrementadas
+    enviarComandoHelio('manual');
+}
+
+async function comandoRefHelio() {
+    if (!currentHelioID) return;
+    if (currentProfile === 'Visualizador') return alert("Acesso Negado.");
+    
+    if (confirm("⚠️ ATENÇÃO: Deseja definir a posição física atual dos motores como ZERO (0°)? Isso irá reescrever a referência interna do encoder.")) {
+        
+        const payload = { tipo: 'set_zero', valores: {}, usuario: currentUser };
+        showLoading("A zerar posição dos motores...");
+        
+        try {
+            const res = await fetch(`/api/heliostato/${currentHelioID}/comando`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json.ok) {
+                alert("Posição Zerada com sucesso!");
+                atualizarDadosModal(); 
+            } else {
+                alert("Erro: " + (json.msg || "Falha ao zerar"));
+            }
+        } catch (e) {
+            alert("Erro de comunicação com o servidor.");
+        } finally {
+            hideLoading();
+        }
+    }
+}
 // =================  (BOTOES DE COMANDO 1 E 2 - MOVER HELIOSTATOS) =================
 async function enviarComandoLote(acao) {
     // Trava de segurança

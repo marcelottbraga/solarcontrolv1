@@ -160,6 +160,27 @@
                         PARAR
                     </button>
                 </div>
+                <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid #444;">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: #aaa; text-align: center; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px;">Ajuste Fino (JOG Incremental)</h4>
+                    
+                    <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; color: #fff; font-size: 0.9em;">
+                        <label style="cursor: pointer;"><input type="radio" name="jogStep" value="1"> 1°</label>
+                        <label style="cursor: pointer;"><input type="radio" name="jogStep" value="0.1" checked> 0.1°</label>
+                        <label style="cursor: pointer;"><input type="radio" name="jogStep" value="0.01"> 0.01°</label>
+                        <label style="cursor: pointer;"><input type="radio" name="jogStep" value="0.001"> 0.001°</label>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <button type="button" class="btn-secondary" style="font-weight: bold; font-size: 1.1em;" onclick="jogHeliostato('A', 1)">A +</button>
+                        <button type="button" class="btn-secondary" style="font-weight: bold; font-size: 1.1em;" onclick="jogHeliostato('A', -1)">A -</button>
+                        <button type="button" class="btn-secondary" style="font-weight: bold; font-size: 1.1em;" onclick="jogHeliostato('B', 1)">B +</button>
+                        <button type="button" class="btn-secondary" style="font-weight: bold; font-size: 1.1em;" onclick="jogHeliostato('B', -1)">B -</button>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center;">
+                        <button type="button" class="btn-danger" style="width: 100%; font-weight: bold; letter-spacing: 1px; padding: 10px; background: #c0392b; border: none; color: #fff; border-radius: 4px; cursor: pointer;" onclick="comandoRefHelio()">REF (ZERAR POSIÇÃO)</button>
+                    </div>
+                </div>
             </div>
 
         </div>
