@@ -77,7 +77,7 @@ def executar_acoes_matriz(app, gatilho):
                         for b in bases:
                             enviar_comando_heliostato(b.numero, 'stow')
                     elif comando == 'VERT':
-                        valores = {'alpha': 90.0, 'beta': 180.0}
+                        valores = {'alpha': 0.0, 'beta': 0.0}
                         for b in bases:
                             enviar_comando_heliostato(b.numero, 'manual', valores)
                     elif comando == 'HORIZ':
@@ -146,23 +146,23 @@ def ler_dados_estacao(app=None):
             rr = client.read_holding_registers(address=0, count=28, slave=slave_id)
             
             if not rr.isError():
-                decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Big)
+                decoder = BinaryPayloadDecoder.fromRegisters(rr.registers, byteorder=Endian.Big, wordorder=Endian.Little)
                 
                 dados = {
-                    'v_bat': round(decoder.decode_32bit_float(), 2),       
-                    'ghi1': round(decoder.decode_32bit_float(), 2),        
-                    'dhi': round(decoder.decode_32bit_float(), 2),         
-                    'bni': round(decoder.decode_32bit_float(), 2),         
-                    'old': round(decoder.decode_32bit_float(), 2),         
-                    'lwd': round(decoder.decode_32bit_float(), 2),         
-                    'vento_vel': round(decoder.decode_32bit_float(), 2),   
-                    'vento_dir': round(decoder.decode_32bit_float(), 2),   
-                    'temp_ar': round(decoder.decode_32bit_float(), 2),     
-                    'umidade_rel': round(decoder.decode_32bit_float(), 2), 
-                    'pressao_atm': round(decoder.decode_32bit_float(), 2), 
-                    'chuva_acum': round(decoder.decode_32bit_float(), 2),  
-                    'cell_irrad': round(decoder.decode_32bit_float(), 2),  
-                    'cell_temp': round(decoder.decode_32bit_float(), 2)    
+                    'v_bat': round(decoder.decode_32bit_float(), 3),       
+                    'ghi1': round(decoder.decode_32bit_float(), 3),        
+                    'dhi': round(decoder.decode_32bit_float(), 3),         
+                    'bni': round(decoder.decode_32bit_float(), 3),         
+                    'old': round(decoder.decode_32bit_float(), 3),         
+                    'lwd': round(decoder.decode_32bit_float(), 3),         
+                    'vento_vel': round(decoder.decode_32bit_float(), 3),   
+                    'vento_dir': round(decoder.decode_32bit_float(), 3),   
+                    'temp_ar': round(decoder.decode_32bit_float(), 3),     
+                    'umidade_rel': round(decoder.decode_32bit_float(), 3), 
+                    'pressao_atm': round(decoder.decode_32bit_float(), 3), 
+                    'chuva_acum': round(decoder.decode_32bit_float(), 3),  
+                    'cell_irrad': round(decoder.decode_32bit_float(), 3),  
+                    'cell_temp': round(decoder.decode_32bit_float(), 3)    
                 }
                 dados['debug_raw'] = rr.registers
                 checar_limites_estacao(dados, config, app)
@@ -511,7 +511,7 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
         ])
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
-            def fmt(val): return str(val).replace('.', ',') if val is not None else ''
+            def fmt(val): return f"{val:.3f}".replace('.', ',') if val is not None else ''            
             writer.writerow([
                 r.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
@@ -572,7 +572,7 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
         colunas = ['Data/Hora', 'Bat.', 'GHI1', 'DHI', 'BNI', 'OLD', 'LWD', 'Vel.Vento', 'Dir.Vento', 'Temp.', 'Umid.', 'Pressão', 'Chuva', 'Cell_Irr', 'Cell_Tmp']
         registros = Historico.query.filter(Historico.data_hora.between(dt_inicio, dt_fim)).order_by(Historico.data_hora.desc()).all()
         for r in registros:
-            def fmt(val): return str(val) if val is not None else '--'
+            def fmt(val): return f"{val:.3f}".replace('.', ',') if val is not None else '--'
             linhas.append([
                 r.data_hora.strftime("%d/%m/%Y %H:%M"),
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),

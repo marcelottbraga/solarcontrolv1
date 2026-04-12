@@ -600,7 +600,7 @@ def api_comando_lote_heliostatos():
         if acao == 'HORIZ' or acao == 'STOW':
             res = services.enviar_comando_heliostato(b.numero, 'stow')
         elif acao == 'VERT':
-            valores = {'alpha': 90.0, 'beta': 180.0}
+            valores = {'alpha': 0.0, 'beta': 0.0}
             res = services.enviar_comando_heliostato(b.numero, 'manual', valores)
         else:
             return jsonify({"ok": False, "erro": "Ação inválida."})
