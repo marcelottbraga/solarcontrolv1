@@ -1526,6 +1526,32 @@ async function atualizarDadosModal() {
 async function enviarComandoHelio(acao) {
     if (!currentHelioID) return;
     
+    // --- NOVO: Intercepta o "Salvar Vetor" para usar a nossa nova rota da API ---
+    if (acao === 'salvar_vetor') {
+        showLoading("Salvando vetor de calibração...");
+        try {
+            const res = await fetch('/api/calibra_vetores', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                // Envia apenas o ID e o Usuário. O Python vai puxar Alfa e Beta do Cache!
+                body: JSON.stringify({ heliostato_id: currentHelioID, usuario: currentUser }) 
+            });
+            
+            const json = await res.json();
+            if (json.ok) {
+                alert("Vetor de calibração salvo com sucesso!");
+            } else {
+                alert("Erro: " + (json.erro || json.msg));
+            }
+        } catch(e) {
+            alert("Erro de comunicação com o servidor.");
+        } finally {
+            hideLoading();
+        }
+        return; // Sai da função aqui para não rodar o código do Modbus abaixo
+    }
+    // -----------------------------------------------------------------------------
+
     let payload = {};
     
     if (acao === 'manual') {
@@ -1539,8 +1565,6 @@ async function enviarComandoHelio(acao) {
         payload = { tipo: 'modo', valores: { modo: 1 }, usuario: currentUser };
     } else if (acao === 'stop') {
         payload = { tipo: 'modo', valores: { modo: 0 }, usuario: currentUser };
-    } else if (acao === 'salvar_vetor') {
-        payload = { tipo: 'salvar_vetor', valores: {}, usuario: currentUser };
     }
     
     showLoading("Enviando comando ao heliostato...");
@@ -1570,6 +1594,7 @@ async function enviarComandoHelio(acao) {
         hideLoading();
     }
 }
+
 // ================= FUNÇÕES DO JOG WEB E ZERAMENTO =================
 
 function jogHeliostato(eixo, direcao) {

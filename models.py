@@ -123,3 +123,13 @@ class LogEvento(db.Model):
     usuario = db.Column(db.String(50))
     tipo_evento = db.Column(db.String(50))
     detalhes = db.Column(db.Text)
+
+# Modelo: Calibração de Vetores
+class CalibraVetores(db.Model):
+    __tablename__ = 'calibra_vetores'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    heliostato_numero = db.Column(db.Integer, db.ForeignKey('heliostato_cadastro.numero'), nullable=False)
+    data_hora = db.Column(db.DateTime, nullable=False)
+    alfa = db.Column(db.Float)
+    beta = db.Column(db.Float)

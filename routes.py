@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, Response, current_app, session
 from extensions import db
-from models import Usuario, HeliostatoCadastro, HeliostatoOperacao, LogAlarme, LogEvento, HistoricoTermopares, Historico
+from models import Usuario, HeliostatoCadastro, HeliostatoOperacao, LogAlarme, LogEvento, HistoricoTermopares, Historico, CalibraVetores
 import services
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
@@ -772,3 +772,70 @@ def api_delete_actions(idx):
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
+
+# --- ROTA DE CALIBRAÇÃO DE VETORES ---
+# Não esqueça de garantir que o ModbusTcpClient está importado no topo do routes.py
+# from pymodbus.client import ModbusTcpClient
+
+@bp.route('/api/calibra_vetores', methods=['POST'])
+def salvar_calibracao():
+    data = request.get_json()
+    
+    heliostato_id = data.get('heliostato_id')
+    alfa = data.get('alfa')
+    beta = data.get('beta')
+    
+    if alfa is None or beta is None:
+        dados_cache = services.CACHE_MEMORIA.get('heliostatos', {}).get(int(heliostato_id), {})
+        alfa = dados_cache.get('alpha', 0.0)
+        beta = dados_cache.get('beta', 0.0)
+
+    data_hora_str = data.get('data_hora')
+    if data_hora_str:
+        try:
+            data_hora = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M:%S")
+        except:
+            data_hora = datetime.now()
+    else:
+        data_hora = datetime.now()
+
+    try:
+        # 1. Grava no Banco de Dados
+        nova_calibracao = CalibraVetores(
+            heliostato_numero=int(heliostato_id), 
+            data_hora=data_hora,
+            alfa=float(alfa),
+            beta=float(beta)
+        )
+        db.session.add(nova_calibracao)
+        db.session.commit()
+        
+        # 2. Registra o Evento
+        usuario = data.get('usuario', 'Painel Físico (ESP32)') 
+        services.registrar_evento(
+            current_app._get_current_object(), 
+            usuario, 
+            "CALIBRAÇÃO", 
+            f"Vetor salvo para o Heliostato {heliostato_id}: Alfa={alfa:.2f}, Beta={beta:.2f}"
+        )
+
+        # 3. ---> O PULO DO GATO: Cutuca o ESP32 via Modbus para recalcular a RAM <---
+        # Verifica se o pedido NÃO veio do próprio painel físico (senão entra em loop)
+        if usuario != 'Painel Físico (ESP32)':
+            base = HeliostatoCadastro.query.filter_by(numero=int(heliostato_id)).first()
+            if base and base.ip:
+                try:
+                    # Conecta na placa e escreve 1 no Holding Register 15
+                    client = ModbusTcpClient(base.ip, port=base.porta, timeout=2)
+                    if client.connect():
+                        client.write_register(15, 1)
+                        client.close()
+                        print(f"-> Sucesso: Cutucão enviado ao ESP32 (IP {base.ip}) no Reg 15!")
+                except Exception as modbus_e:
+                    print(f"-> BD Salvo, mas falha ao cutucar o ESP32 via Modbus: {modbus_e}")
+
+        return jsonify({"ok": True, "msg": "Calibração salva com sucesso!"})
+        
+    except Exception as e:
+        print(f"Erro ao salvar calibração: {e}")
+        return jsonify({"ok": False, "erro": str(e)}), 500
