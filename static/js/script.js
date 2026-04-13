@@ -1468,12 +1468,12 @@ async function atualizarDadosModal() {
         if (isOnline) {
             let vAlpha = "--";
             if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
-                vAlpha = parseFloat(dados.alpha).toFixed(2) + '°';
+                vAlpha = parseFloat(dados.alpha).toFixed(3) + '°';
             }
             
             let vBeta = "--";
             if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
-                vBeta = parseFloat(dados.beta).toFixed(2) + '°';
+                vBeta = parseFloat(dados.beta).toFixed(3) + '°';
             }
 
             // ---> A CORREÇÃO: USANDO OS SEUS IDs ORIGINAIS <---

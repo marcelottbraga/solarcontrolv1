@@ -816,10 +816,10 @@ def salvar_calibracao():
             current_app._get_current_object(), 
             usuario, 
             "CALIBRAÇÃO", 
-            f"Vetor salvo para o Heliostato {heliostato_id}: Alfa={alfa:.2f}, Beta={beta:.2f}"
+            f"Vetor salvo para o Heliostato {heliostato_id}: Alfa={alfa:.3f}, Beta={beta:.3f}"
         )
 
-        # 3. ---> O PULO DO GATO: Cutuca o ESP32 via Modbus para recalcular a RAM <---
+        
         # Verifica se o pedido NÃO veio do próprio painel físico (senão entra em loop)
         if usuario != 'Painel Físico (ESP32)':
             base = HeliostatoCadastro.query.filter_by(numero=int(heliostato_id)).first()
