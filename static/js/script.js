@@ -1141,7 +1141,6 @@ function checkHelioIndividual() {
     document.getElementById('helioCheckTodos').checked = (total > 0 && total === marcados);
 }
 
-// Uma função auxiliar para não repetir código
 function obterFiltrosRelatorio(tipo) {
     let filtros = [];
     if (tipo === 'events') {
@@ -1150,7 +1149,7 @@ function obterFiltrosRelatorio(tipo) {
             // Mantém a regra do Logout casada com o Login
             if (cb.value === 'LOGIN') filtros.push('LOGOUT'); 
         });
-    } else if (tipo === 'heliostatos') {
+    } else if (tipo === 'heliostatos' || tipo === 'calibracoes') {
         const todos = document.getElementById('helioCheckTodos');
         if (todos && todos.checked) {
             filtros.push('TODOS');
@@ -1160,14 +1159,14 @@ function obterFiltrosRelatorio(tipo) {
     }
     return filtros;
 }
-
+    
 function toggleReportOptions() {
     const tipo = document.getElementById('reportType').value;
     const divEvents = document.getElementById('eventFilterOptions');
     const divHelios = document.getElementById('helioFilterOptions'); 
     
     divEvents.style.display = (tipo === 'events') ? 'block' : 'none';
-    if(divHelios) divHelios.style.display = (tipo === 'heliostatos') ? 'block' : 'none'; 
+    if(divHelios) divHelios.style.display = (tipo === 'heliostatos' || tipo === 'calibracoes') ? 'block' : 'none'; 
 
     const btnView = document.getElementById('btnVisualizarTela');
     const previewArea = document.getElementById('previewArea');
@@ -1187,7 +1186,6 @@ function toggleReportOptions() {
         btnPDF.style.visibility = 'visible';
     }
 }
-
 async function buscarDadosRelatorio() {
     const tipo = document.getElementById('reportType').value;
     const inicio = document.getElementById('reportStartDate').value;

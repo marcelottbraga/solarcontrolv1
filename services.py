@@ -15,7 +15,7 @@ from pymodbus.client import ModbusTcpClient
 from sqlalchemy import or_
 
 from extensions import db
-from models import Historico, HistoricoTermopares, LogAlarme, LogEvento, HeliostatoCadastro, HeliostatoOperacao
+from models import Historico, HistoricoTermopares, LogAlarme, LogEvento, HeliostatoCadastro, HeliostatoOperacao, CalibraVetores
 from flask import render_template
 from weasyprint import HTML
 
@@ -517,7 +517,7 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
                 fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
                 fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
-                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp) # <--- AQUI
+                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp)
             ])
 
     elif tipo == 'sensors':
@@ -542,6 +542,22 @@ def gerar_conteudo_csv(tipo, dt_inicio, dt_fim, filtros):
         for r in registros:
             def fmt(val): return str(val).replace('.', ',') if val is not None else ''
             writer.writerow([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), r.numero, r.status, fmt(r.alpha), fmt(r.beta), fmt(r.theta), fmt(r.phi)])
+
+    elif tipo == 'calibracoes':
+        writer.writerow(['Data/Hora', 'Heliostato', 'Alfa (°)', 'Beta (°)'])
+        query = CalibraVetores.query.filter(CalibraVetores.data_hora.between(dt_inicio, dt_fim))
+        if filtros and 'TODOS' not in filtros:
+            num_filtros = [int(f) for f in filtros if f.isdigit()]
+            if num_filtros: query = query.filter(CalibraVetores.heliostato_numero.in_(num_filtros))
+            
+        registros = query.order_by(CalibraVetores.data_hora.desc()).all()
+        for r in registros:
+            writer.writerow([
+                r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), 
+                f"Helio {r.heliostato_numero}", 
+                f"{r.alfa:.3f}".replace('.', ','), 
+                f"{r.beta:.3f}".replace('.', ',')
+            ])
 
     return si.getvalue()
 
@@ -578,7 +594,7 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
                 fmt(r.v_bat), fmt(r.ghi1), fmt(r.dhi), fmt(r.bni),
                 fmt(r.old), fmt(r.lwd), fmt(r.vento_vel), fmt(r.vento_dir),
                 fmt(r.temp_ar), fmt(r.umidade_rel), fmt(r.pressao_atm),
-                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp) # <--- AQUI
+                fmt(r.chuva_acum), fmt(r.cell_irrad), fmt(r.cell_temp)
             ])
 
     elif tipo == 'heliostatos':
@@ -595,6 +611,24 @@ def gerar_arquivo_pdf(tipo, dt_inicio, dt_fim, filtros, usuario_solicitante):
             def fmt(val): return str(val) if val is not None else '--'
             linhas.append([r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), str(r.numero), r.status, fmt(r.alpha), fmt(r.beta), fmt(r.theta), fmt(r.phi)])
 
+    elif tipo == 'calibracoes':
+        titulo = "Histórico de Calibração de Vetores"
+        colunas = ['Data/Hora', 'Heliostato', 'Alfa (°)', 'Beta (°)']
+        query = CalibraVetores.query.filter(CalibraVetores.data_hora.between(dt_inicio, dt_fim))
+        if filtros and 'TODOS' not in filtros:
+            num_filtros = [int(f) for f in filtros if f.isdigit()]
+            if num_filtros: query = query.filter(CalibraVetores.heliostato_numero.in_(num_filtros))
+            
+        registros = query.order_by(CalibraVetores.data_hora.desc()).all()
+        for r in registros:
+            linhas.append([
+                r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), 
+                f"Helio {r.heliostato_numero}", 
+                f"{r.alfa:.3f}", 
+                f"{r.beta:.3f}"
+            ])
+
+            
     # Renderiza HTML
     html_string = render_template('reports/pdf_template.html', 
                                   titulo=titulo,

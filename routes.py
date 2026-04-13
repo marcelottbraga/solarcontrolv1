@@ -374,9 +374,28 @@ def api_gerar_relatorio_tela():
         if filtros: query = query.filter(LogEvento.tipo_evento.in_(filtros))
         regs = query.order_by(LogEvento.data_hora.desc()).all()
         for r in regs: resultado.append({"Data": r.data_hora.strftime("%d/%m/%Y %H:%M"), "Usuário": r.usuario, "Evento": r.tipo_evento, "Detalhes": r.detalhes})
+    
     elif tipo == 'alarms':
         regs = LogAlarme.query.filter(LogAlarme.data_hora.between(dt_inicio, dt_fim)).order_by(LogAlarme.data_hora.desc()).all()
         for r in regs: resultado.append({"Data": r.data_hora.strftime("%d/%m/%Y %H:%M"), "Categoria": r.categoria, "Mensagem": r.mensagem})
+    
+    elif tipo == 'calibracoes':
+        query = CalibraVetores.query.filter(CalibraVetores.data_hora.between(dt_inicio, dt_fim))
+        
+        if filtros and 'TODOS' not in filtros:
+            numeros_heliostatos = [int(f) for f in filtros]
+            query = query.filter(CalibraVetores.heliostato_numero.in_(numeros_heliostatos))
+            
+        regs = query.order_by(CalibraVetores.data_hora.desc()).all()
+        
+        for r in regs: 
+            resultado.append({
+                "Data/Hora": r.data_hora.strftime("%d/%m/%Y %H:%M:%S"), 
+                "Heliostato": f"Helio {r.heliostato_numero}", 
+                "Alfa (°)": f"{r.alfa:.3f}", # Mantém as 3 casas decimais!
+                "Beta (°)": f"{r.beta:.3f}"  # Mantém as 3 casas decimais!
+            })
+    # -----------------------------------------------
     
     return jsonify(resultado)
 
