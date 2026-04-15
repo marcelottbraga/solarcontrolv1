@@ -1666,7 +1666,7 @@ async function enviarComandoLote(acao) {
 
     let mensagemConfirmacao = "";
     if (acao === 'HORIZ') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição HORIZONTAL?";
-    if (acao === 'VERT')  mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição VERTICAL?";
+    if (acao === 'LIMPEZA') mensagemConfirmacao = "Tem certeza que deseja mover TODOS os heliostatos para a posição de LIMPEZA?";
 
     if (!confirm(mensagemConfirmacao)) return;
 
@@ -2279,7 +2279,7 @@ function fecharMatrizAcoes() {
 
 function abrirFormNovaAcao() {
     document.getElementById('acaoGatilho').value = "Vel. Vento Alto";
-    document.getElementById('acaoComando').value = "HORIZ";
+    document.getElementById('acaoComando').value = "STOW";
     document.getElementById('modalFormAcao').style.display = 'flex';
 }
 

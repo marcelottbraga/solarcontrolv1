@@ -76,13 +76,18 @@ def executar_acoes_matriz(app, gatilho):
                     if comando == 'STOW':
                         for b in bases:
                             enviar_comando_heliostato(b.numero, 'stow')
-                    elif comando == 'VERT':
-                        valores = {'alpha': 0.0, 'beta': 0.0}
+                    elif comando == 'LIMPEZA':
                         for b in bases:
-                            enviar_comando_heliostato(b.numero, 'manual', valores)
-                    elif comando == 'HORIZ':
-                        # Em discussão: não faz nada
-                        continue
+                            enviar_comando_heliostato(b.numero, 'limpeza')
+                    elif comando == 'CMD3':
+                        for b in bases:
+                            enviar_comando_heliostato(b.numero, 'cmd3')
+                    elif comando == 'CMD4':
+                        for b in bases:
+                            enviar_comando_heliostato(b.numero, 'cmd4')
+                    elif comando == 'CMD5':
+                        for b in bases:
+                            enviar_comando_heliostato(b.numero, 'cmd5')
                     else:
                         continue 
                         
@@ -887,6 +892,22 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
 
             elif tipo_comando == 'stow':
                 client.write_register(address=14, value=1)
+                sucesso = True
+            
+            elif tipo_comando == 'limpeza':
+                client.write_register(address=14, value=2)
+                sucesso = True
+
+            elif tipo_comando == 'cmd3':
+                client.write_register(address=14, value=3)
+                sucesso = True
+
+            elif tipo_comando == 'cmd4':
+                client.write_register(address=14, value=4)
+                sucesso = True
+
+            elif tipo_comando == 'cmd5':
+                client.write_register(address=14, value=5)
                 sucesso = True
             
             elif tipo_comando == 'set_zero':

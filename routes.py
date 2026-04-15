@@ -615,12 +615,10 @@ def api_comando_lote_heliostatos():
     resultados = []
     
     for b in bases:
-        # Se clicar no botão em lote que antes mandava 11 e 0, agora ele cutuca o ESP32
         if acao == 'HORIZ' or acao == 'STOW':
             res = services.enviar_comando_heliostato(b.numero, 'stow')
-        elif acao == 'VERT':
-            valores = {'alpha': 0.0, 'beta': 0.0}
-            res = services.enviar_comando_heliostato(b.numero, 'manual', valores)
+        elif acao == 'LIMPEZA':
+            res = services.enviar_comando_heliostato(b.numero, 'limpeza')
         else:
             return jsonify({"ok": False, "erro": "Ação inválida."})
             
