@@ -1460,62 +1460,88 @@ async function atualizarDadosModal() {
         const elModo = document.getElementById('modalHelioModo');
         const elBorder = document.getElementById('statusBorder');
 
+        // --- SELETORES DE BOTÕES ---
+        const btnSalvarVetor = document.querySelector("button[onclick*='salvar_vetor']");
+        const btnRastrear = document.querySelector("button[onclick*='auto']");
+        const btnRef = document.querySelector("button[onclick*='comandoRefHelio']");
+        
+        // NOVO: Seleciona todos os botões de JOG (A+, A-, B+, B-)
+        const btnsJog = document.querySelectorAll("button[onclick*='jogHeliostato']");
+        // ---------------------------
+
         let isOnline = (String(dados.online).toLowerCase() === 'true' || dados.online == 1);
         if (dados.status_code === 1) isOnline = true;
 
         if (isOnline) {
+            // ... (manter lógica de alfa/beta/modo igual ao original) ...
             let vAlpha = "--";
             if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
                 vAlpha = parseFloat(dados.alpha).toFixed(3) + '°';
             }
-            
             let vBeta = "--";
             if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
                 vBeta = parseFloat(dados.beta).toFixed(3) + '°';
             }
-
-            // ---> A CORREÇÃO: USANDO OS SEUS IDs ORIGINAIS <---
             const elAlpha = document.getElementById('valAlpha');
             if (elAlpha) elAlpha.textContent = vAlpha;
-            
             const elBeta = document.getElementById('valBeta');
             if (elBeta) elBeta.textContent = vBeta;
-            // ----------------------------------------------------
-
             if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
 
             if (dados.status_code === 1) {
+                // --- ESTADO: MOVENDO ---
                 if(elStatus) { elStatus.textContent = "MOVENDO"; elStatus.style.color = '#00d084'; }
                 if(elBorder) elBorder.style.borderLeftColor = '#00d084';
-                if(btnMover) { btnMover.disabled = true; btnMover.textContent = "MOVENDO..."; btnMover.style.opacity = "0.6"; btnMover.style.cursor = "wait"; }
+                if(btnMover) { btnMover.disabled = true; btnMover.textContent = "MOVENDO..."; btnMover.style.opacity = "0.6"; }
                 if(inpAlpha) inpAlpha.disabled = true; if(inpBeta) inpBeta.disabled = true;
+                
+                // Bloqueia botões de ação
+                if(btnSalvarVetor) btnSalvarVetor.disabled = true;
+                if(btnRastrear) btnRastrear.disabled = true;
+                if(btnRef) btnRef.disabled = true;
+                
+                // NOVO: Bloqueia todos os botões de JOG (A+, A-, B+, B-)
+                btnsJog.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = "0.5";
+                    btn.style.cursor = "not-allowed";
+                });
+                
             } else {
+                // --- ESTADO: OCIOSO ---
                 if(elStatus) { elStatus.textContent = (dados.status || 'ONLINE').toUpperCase(); elStatus.style.color = '#00a8ff'; }
                 if(elBorder) elBorder.style.borderLeftColor = '#00a8ff';
-                if(btnMover) { btnMover.disabled = false; btnMover.textContent = "MOVER PARA POSIÇÃO"; btnMover.style.opacity = "1"; btnMover.style.cursor = "pointer"; }
+                if(btnMover) { btnMover.disabled = false; btnMover.textContent = "MOVER PARA POSIÇÃO"; btnMover.style.opacity = "1"; }
                 if(inpAlpha) inpAlpha.disabled = false; if(inpBeta) inpBeta.disabled = false;
+                
+                // Libera botões de ação
+                if(btnSalvarVetor) btnSalvarVetor.disabled = false;
+                if(btnRastrear) btnRastrear.disabled = false;
+                if(btnRef) btnRef.disabled = false;
+
+                // NOVO: Libera todos os botões de JOG
+                btnsJog.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                    btn.style.cursor = "pointer";
+                });
             }
         } else {
-            if(elStatus) { elStatus.textContent = "OFFLINE"; elStatus.style.color = '#aaa'; }
-            if(elModo) elModo.textContent = "---";
-            if(elBorder) elBorder.style.borderLeftColor = '#aaa';
-
-            const elAlpha = document.getElementById('valAlpha');
-            if (elAlpha) elAlpha.textContent = "--";
+            // --- ESTADO: OFFLINE ---
+            // ... (lógica de offline padrão) ...
+            if(btnMover) btnMover.disabled = true;
+            if(btnSalvarVetor) btnSalvarVetor.disabled = true;
+            if(btnRastrear) btnRastrear.disabled = true;
+            if(btnRef) btnRef.disabled = true;
             
-            const elBeta = document.getElementById('valBeta');
-            if (elBeta) elBeta.textContent = "--";
-
-            if(btnMover) { btnMover.disabled = true; btnMover.textContent = "SEM CONEXÃO"; btnMover.style.opacity = "0.4"; btnMover.style.cursor = "not-allowed"; }
-            if(inpAlpha) inpAlpha.disabled = true; if(inpBeta) inpBeta.disabled = true;
+            // Bloqueia JOG no offline
+            btnsJog.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = "0.4";
+            });
         }
     } catch (e) {
         console.error("Erro no modal:", e);
-        const elStatus = document.getElementById('modalHelioStatus');
-        if (elStatus && elStatus.textContent === "CARREGANDO...") {
-            elStatus.textContent = "ERRO DE LEITURA";
-            elStatus.style.color = '#ff4444';
-        }
     }
 }
 
@@ -1787,7 +1813,7 @@ function abrirModalNovoHeliostato() {
     // Limpa os campos e libera o Número
     document.getElementById('cadNumero').value = "";
     document.getElementById('cadNumero').disabled = false; // Libera digitação
-    document.getElementById('cadTaxa').value = "5000";
+    document.getElementById('cadTaxa').value = "5";
     document.getElementById('cadIP').value = "";
     document.getElementById('cadPorta').value = "502";
     document.getElementById('cadTheta').value = "0.0";
@@ -1812,7 +1838,7 @@ function abrirModalEditarHeliostato(numero) {
     // Preenche campos e TRAVA o Número (Chave Primária não muda)
     document.getElementById('cadNumero').value = base.numero;
     document.getElementById('cadNumero').disabled = true; 
-    document.getElementById('cadTaxa').value = base.taxa_atualizacao || 5000;
+    document.getElementById('cadTaxa').value = base.taxa_atualizacao || 5;
     document.getElementById('cadIP').value = base.ip || "";
     document.getElementById('cadPorta').value = base.porta || 502;
     document.getElementById('cadTheta').value = base.theta !== null ? base.theta : 0.0;

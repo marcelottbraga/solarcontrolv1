@@ -942,10 +942,11 @@ def loop_gravacao_heliostatos(app):
                 
                 for b in bases:
                     num = b.numero
-                    taxa_ms = b.taxa_atualizacao if b.taxa_atualizacao else 5000
+                   # Se vazio, o padrão é 5.
+                    taxa_bd = b.taxa_atualizacao if b.taxa_atualizacao else 5
                     
-                    # Converte ms para segundos. Mínimo de 0.5s para não engasgar a CPU do servidor.
-                    taxa_segundos = max(0.5, taxa_ms / 1000.0) 
+                    #Mantém apenas a trava de segurança mínima de 0.5s.
+                    taxa_segundos = max(0.5, float(taxa_bd)) 
                     
                     ultimo_tempo = ultimas_gravacoes.get(num, 0)
                     

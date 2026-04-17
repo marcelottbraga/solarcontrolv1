@@ -1397,7 +1397,7 @@ button {
 }
 
 .brand-logo {
-    height: 90px; 
+    height: 70px; 
     width: auto;
     object-fit: contain;
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
