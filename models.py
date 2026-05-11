@@ -133,3 +133,18 @@ class CalibraVetores(db.Model):
     data_hora = db.Column(db.DateTime, nullable=False)
     alfa = db.Column(db.Float)
     beta = db.Column(db.Float)
+
+    # Modelo: Arquivo de Calibrações (Shadow Table)
+class CalibraVetoresArquivado(db.Model):
+    __tablename__ = 'calibra_vetores_arquivado'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    heliostato_numero = db.Column(db.Integer, nullable=False)
+    data_hora = db.Column(db.DateTime, nullable=False)
+    alfa = db.Column(db.Float)
+    beta = db.Column(db.Float)
+    # Coluna extra para saber quando foi arquivado
+    data_exclusao = db.Column(db.DateTime, default=datetime.now)
+
+    def __repr__(self):
+        return f"<CalibraArquivada Helio:{self.heliostato_numero} em {self.data_exclusao}>"

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, Response, current_app, session
 from extensions import db
-from models import Usuario, HeliostatoCadastro, HeliostatoOperacao, LogAlarme, LogEvento, HistoricoTermopares, Historico, CalibraVetores
+from models import Usuario, HeliostatoCadastro, HeliostatoOperacao, LogAlarme, LogEvento, HistoricoTermopares, Historico, CalibraVetores, CalibraVetoresArquivado
 import services
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
@@ -289,16 +289,35 @@ def deletar_base(numero):
     
     solicitante = Usuario.query.filter_by(usuario=user_nome).first()
     if not solicitante or solicitante.perfil != 'Administrador':
-        return jsonify({"ok": False, "erro": "Acesso Negado."})
+        return jsonify({"ok": False, "erro": "Acesso Negado: Apenas Administradores podem excluir heliostatos."})
 
     base = HeliostatoCadastro.query.get_or_404(numero)
     try:
+        # 1. Busca todas as calibrações vinculadas a este heliostato
+        calibracoes = CalibraVetores.query.filter_by(heliostato_numero=numero).all()
+        
+        # 2. Move os dados para a Shadow Table
+        for cal in calibracoes:
+            arquivo = CalibraVetoresArquivado(
+                heliostato_numero=cal.heliostato_numero,
+                data_hora=cal.data_hora,
+                alfa=cal.alfa,
+                beta=cal.beta
+            )
+            db.session.add(arquivo)
+            # Remove da tabela original 
+            db.session.delete(cal)
+        
+        
         db.session.delete(base)
         db.session.commit()
-        services.registrar_evento(current_app._get_current_object(), user_nome, "HELIOSTATOS", f"Excluiu heliostato {numero}")
+        
+        services.registrar_evento(current_app._get_current_object(), user_nome, "HELIOSTATOS", f"Excluiu heliostato {numero}. Dados movidos para arquivo morto.")
         return jsonify({"ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "erro": str(e)})
+        db.session.rollback()
+        print(f"Erro ao excluir heliostato: {e}")
+        return jsonify({"ok": False, "erro": f"Erro interno ao arquivar dados: {str(e)}"})
     
 # API: usuários (listar/criar)
 @bp.route('/api/users', methods=['GET'])

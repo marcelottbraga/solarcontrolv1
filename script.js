@@ -1469,25 +1469,26 @@ async function atualizarDadosModal() {
         const btnsJog = document.querySelectorAll("button[onclick*='jogHeliostato']");
         // ---------------------------
 
-        let isOnline = (String(dados.online).toLowerCase() === 'true' || dados.online == 1);
-        if (dados.status_code === 1) isOnline = true;
 
-        if (isOnline) {
-            // ... (manter lógica de alfa/beta/modo igual ao original) ...
-            let vAlpha = "--";
+        let vAlpha = "--";
             if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
                 vAlpha = parseFloat(dados.alpha).toFixed(3) + '°';
             }
-            let vBeta = "--";
+        let vBeta = "--";
             if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
                 vBeta = parseFloat(dados.beta).toFixed(3) + '°';
             }
             const elAlpha = document.getElementById('valAlpha');
-            if (elAlpha) elAlpha.textContent = vAlpha;
+        if (elAlpha) elAlpha.textContent = vAlpha;
             const elBeta = document.getElementById('valBeta');
-            if (elBeta) elBeta.textContent = vBeta;
-            if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
+        if (elBeta) elBeta.textContent = vBeta;
+        if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
+        
+        let isOnline = (String(dados.online).toLowerCase() === 'true' || dados.online == 1);
+        if (dados.status_code === 1) isOnline = true;
 
+        if (isOnline) {
+         
             if (dados.status_code === 1) {
                 // --- ESTADO: MOVENDO ---
                 if(elStatus) { elStatus.textContent = "MOVENDO"; elStatus.style.color = '#00d084'; }
