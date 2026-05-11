@@ -805,7 +805,7 @@ def ler_dados_heliostato(heliostato_id):
     ip = base.ip if base.ip else '127.0.0.1'
     porta = base.porta if base.porta else 502
 
-    client = ModbusTcpClient(ip, port=porta, timeout=3.0)
+    client = ModbusTcpClient(ip, port=porta, timeout=10.0)
     
     dados = {
         "online": False,
@@ -929,10 +929,12 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
 
 def loop_gravacao_heliostatos(app):
     """
-    Loop em background que lê a 'taxa_atualizacao' (em ms) do banco 
-    e grava o histórico de operação continuamente.
+    Loop em background com tarefas SEPARADAS:
+    1. Lê Modbus e atualiza a tela a cada 1 segundo.
+    2. Grava no Banco de Dados usando a taxa configurada (ex: 60s).
     """
     ultimas_gravacoes = {}
+    ultimas_leituras = {} # NOVO: Controla a atualização em tempo real da tela
     
     while True:
         with app.app_context():
@@ -942,36 +944,36 @@ def loop_gravacao_heliostatos(app):
                 
                 for b in bases:
                     num = b.numero
-                   # Se vazio, o padrão é 5.
                     taxa_bd = b.taxa_atualizacao if b.taxa_atualizacao else 5
-                    
-                    #Mantém apenas a trava de segurança mínima de 0.5s.
                     taxa_segundos = max(0.5, float(taxa_bd)) 
                     
                     ultimo_tempo = ultimas_gravacoes.get(num, 0)
+                    ultima_leitura = ultimas_leituras.get(num, 0)
                     
-                   # Chegou a hora de gravar para este heliostato específico?
-                    if (agora - ultimo_tempo) >= taxa_segundos:
+                    # --- TAREFA 1: ATUALIZAR TELA (A cada 1 segundo) ---
+                    if (agora - ultima_leitura) >= 1.0:
                         dados = ler_dados_heliostato(num)
-                        
-                        # --- NOVO: SALVA NO CACHE IMEDIATAMENTE PARA O FLASK LER ---
                         if dados:
                             CACHE_MEMORIA['heliostatos'][num] = dados
+                        ultimas_leituras[num] = agora
                             
-                        # Só grava no histórico se a comunicação Modbus funcionou (online = True)
-                        if dados and dados.get('online'):
+                    # --- TAREFA 2: GRAVAR NO BANCO (Usando sua taxa de 60s) ---
+                    if (agora - ultimo_tempo) >= taxa_segundos:
+                        # Lê os dados do cache que agora estão sempre frescos
+                        dados_db = CACHE_MEMORIA.get('heliostatos', {}).get(num)
+                        
+                        if dados_db and dados_db.get('online'):
                             nova_operacao = HeliostatoOperacao(
                                 numero=num,
-                                status=dados.get('status', 'Desconhecido'),
-                                alpha=dados.get('alpha', 0.0),
-                                beta=dados.get('beta', 0.0),
+                                status=dados_db.get('status', 'Desconhecido'),
+                                alpha=dados_db.get('alpha', 0.0),
+                                beta=dados_db.get('beta', 0.0),
                                 theta=b.theta,
                                 phi=b.phi,
                                 data_hora=datetime.now()
                             )
                             db.session.add(nova_operacao)
                             
-                        # Atualiza o relógio interno para este heliostato
                         ultimas_gravacoes[num] = agora
                 
                 db.session.commit()
@@ -979,7 +981,6 @@ def loop_gravacao_heliostatos(app):
                 print(f"Erro loop gravacao heliostatos: {e}")
                 db.session.rollback()
                 
-        # Pausa curta para não monopolizar o processador
         time.sleep(0.5)
         
 def loop_monitoramento_rapido(app):
