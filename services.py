@@ -805,7 +805,7 @@ def ler_dados_heliostato(heliostato_id):
     ip = base.ip if base.ip else '127.0.0.1'
     porta = base.porta if base.porta else 502
 
-    client = ModbusTcpClient(ip, port=porta, timeout=1.0)
+    client = ModbusTcpClient(ip, port=porta, timeout=3.0)
     
     dados = {
         "online": False,
@@ -829,8 +829,8 @@ def ler_dados_heliostato(heliostato_id):
                 
                 # Proteção extra: só lê os índices se o simulador realmente devolveu 13 itens
                 if len(regs) >= 13:
-                    dados["alpha"] = decodificar_angulo_custom(regs[0], regs[1])
-                    dados["beta"] = decodificar_angulo_custom(regs[2], regs[3])
+                    dados["alpha"] = decodificar_angulo_custom(regs[4], regs[5])
+                    dados["beta"] = decodificar_angulo_custom(regs[6], regs[7])
                     dados["modo"] = "Automático" if regs[10] == 1 else "Manual"
                     dados["status_code"] = regs[11]
                     dados["status"] = "Movendo" if regs[11] == 1 else "Ocioso"
