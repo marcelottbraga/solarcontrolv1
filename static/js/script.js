@@ -1460,27 +1460,29 @@ async function atualizarDadosModal() {
         const elModo = document.getElementById('modalHelioModo');
         const elBorder = document.getElementById('statusBorder');
 
-        // --- SELETORES DE BOTÕES ---
-        const btnSalvarVetor = document.querySelector("button[onclick*='salvar_vetor']");
-        const btnRastrear = document.querySelector("button[onclick*='auto']");
+        // --- SELETORES DE BOTÕES ATUALIZADOS ---
+        const btnSalvarVetor = document.getElementById('btnSalvarVetor');
+        const btnRastrear = document.getElementById('btnRastrear');
         const btnRef = document.querySelector("button[onclick*='comandoRefHelio']");
+        const btnParar = document.getElementById('btnParar');
+        const btnStow = document.getElementById('btnStow'); // O novo botão STOW
         
-        // NOVO: Seleciona todos os botões de JOG (A+, A-, B+, B-)
+        // Seleciona todos os botões de JOG (A+, A-, B+, B-)
         const btnsJog = document.querySelectorAll("button[onclick*='jogHeliostato']");
         // ---------------------------
 
-
+        // --- ATUALIZAÇÃO DOS EIXOS ---
         let vAlpha = "--";
-            if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
-                vAlpha = parseFloat(dados.alpha).toFixed(3) + '°';
-            }
+        if (dados.alpha !== undefined && dados.alpha !== "--" && !isNaN(dados.alpha)) {
+            vAlpha = parseFloat(dados.alpha).toFixed(3) + '°';
+        }
         let vBeta = "--";
-            if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
-                vBeta = parseFloat(dados.beta).toFixed(3) + '°';
-            }
-            const elAlpha = document.getElementById('valAlpha');
+        if (dados.beta !== undefined && dados.beta !== "--" && !isNaN(dados.beta)) {
+            vBeta = parseFloat(dados.beta).toFixed(3) + '°';
+        }
+        const elAlpha = document.getElementById('valAlpha');
         if (elAlpha) elAlpha.textContent = vAlpha;
-            const elBeta = document.getElementById('valBeta');
+        const elBeta = document.getElementById('valBeta');
         if (elBeta) elBeta.textContent = vBeta;
         if(elModo) elModo.textContent = (dados.modo || '--').toUpperCase();
         
@@ -1500,8 +1502,9 @@ async function atualizarDadosModal() {
                 if(btnSalvarVetor) btnSalvarVetor.disabled = true;
                 if(btnRastrear) btnRastrear.disabled = true;
                 if(btnRef) btnRef.disabled = true;
+                if(btnStow) btnStow.disabled = true; 
                 
-                // NOVO: Bloqueia todos os botões de JOG (A+, A-, B+, B-)
+                // Bloqueia todos os botões de JOG (A+, A-, B+, B-)
                 btnsJog.forEach(btn => {
                     btn.disabled = true;
                     btn.style.opacity = "0.5";
@@ -1519,8 +1522,9 @@ async function atualizarDadosModal() {
                 if(btnSalvarVetor) btnSalvarVetor.disabled = false;
                 if(btnRastrear) btnRastrear.disabled = false;
                 if(btnRef) btnRef.disabled = false;
+                if(btnStow) btnStow.disabled = false; 
 
-                // NOVO: Libera todos os botões de JOG
+                // Libera todos os botões de JOG
                 btnsJog.forEach(btn => {
                     btn.disabled = false;
                     btn.style.opacity = "1";
@@ -1529,14 +1533,24 @@ async function atualizarDadosModal() {
             }
         } else {
             // --- ESTADO: OFFLINE ---
-            // ... (lógica de offline padrão) ...
-            if(elStatus) { elStatus.textContent = "OFFLINE"; elStatus.style.color = '#ff4444'; }
-            if(elBorder) elBorder.style.borderLeftColor = '#ff4444';
-            if(btnMover) { btnMover.disabled = true; btnMover.textContent = "DESCONECTADO"; btnMover.style.opacity = "0.5"; }
+            if (elStatus && elStatus.textContent !== "MOVENDO") {
+                elStatus.textContent = "OFFLINE";
+                elStatus.style.color = '#ff4444';
+            }
+            if (elBorder && elStatus && elStatus.textContent !== "MOVENDO") {
+                elBorder.style.borderLeftColor = '#ff4444';
+            }
+
+            if(btnMover && elStatus && elStatus.textContent !== "MOVENDO") { 
+                btnMover.disabled = true; 
+                btnMover.textContent = "DESCONECTADO"; 
+                btnMover.style.opacity = "0.5"; 
+            }
             
             if(btnSalvarVetor) btnSalvarVetor.disabled = true;
             if(btnRastrear) btnRastrear.disabled = true;
             if(btnRef) btnRef.disabled = true;
+            if(btnStow) btnStow.disabled = true; 
             
             btnsJog.forEach(btn => {
                 btn.disabled = true;
@@ -1591,7 +1605,9 @@ async function enviarComandoHelio(acao) {
     } else if (acao === 'auto') {
         payload = { tipo: 'modo', valores: { modo: 1 }, usuario: currentUser };
     } else if (acao === 'stop') {
-        payload = { tipo: 'modo', valores: { modo: 0 }, usuario: currentUser };
+        payload = { tipo: 'stop', valores: {}, usuario: currentUser };
+    } else if (acao === 'stow') {
+        payload = { tipo: 'stow', valores: {}, usuario: currentUser };
     }
     
     showLoading("Enviando comando ao heliostato...");

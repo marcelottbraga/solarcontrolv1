@@ -147,19 +147,24 @@
                     MOVER PARA POSIÇÃO
                 </button>
                 
-                <button id="btnSalvarVetor" class="btn-primary" onclick="enviarComandoHelio('salvar_vetor')" style="width: 100%; margin-bottom: 15px;">
-                    SALVAR VETOR RECEPTOR
-                </button>
-                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btnStow" class="btn-primary" onclick="enviarComandoHelio('stow')" style="flex: 1; background: #ffa500; border: none; color: #000; font-weight: bold;">
+                        STOW
+                    </button>
+                    <button id="btnSalvarVetor" class="btn-primary" onclick="enviarComandoHelio('salvar_vetor')" style="flex: 1;">
+                        SALVAR VETOR
+                    </button>
+                </div>
                
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn-secondary" onclick="enviarComandoHelio('auto')" style="flex: 1; border: 1px solid var(--color-success); color: var(--color-success);">
+                    <button id="btnRastrear" class="btn-secondary" onclick="enviarComandoHelio('auto')" style="flex: 1; border: 1px solid var(--color-success); color: var(--color-success);">
                         RASTREAR
                     </button>
-                    <button class="btn-secondary" onclick="enviarComandoHelio('stop')" style="flex: 1; border: 1px solid var(--color-error); color: var(--color-error);">
+                    <button id="btnParar" class="btn-secondary" onclick="enviarComandoHelio('stop')" style="flex: 1; border: 1px solid var(--color-error); color: var(--color-error);">
                         PARAR
                     </button>
                 </div>
+
                 <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid #444;">
                     <h4 style="margin-top: 0; margin-bottom: 15px; color: #aaa; text-align: center; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px;">Ajuste Fino (JOG Incremental)</h4>
                     

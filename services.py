@@ -890,6 +890,10 @@ def enviar_comando_heliostato(heliostato_id, tipo_comando, valores=None):
                 client.write_register(address=15, value=1)
                 sucesso = True
 
+            elif tipo_comando == 'stop':
+                client.write_register(address=16, value=1)
+                sucesso = True
+            
             elif tipo_comando == 'stow':
                 client.write_register(address=14, value=1)
                 sucesso = True
